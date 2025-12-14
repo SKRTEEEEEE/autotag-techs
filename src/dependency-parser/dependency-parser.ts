@@ -113,11 +113,19 @@ export class DependencyParser {
           }
         }
       }
-    } catch {
-      // Failed to read directory, skip
+    } catch (error) {
+      // Failed to read directory, log it
+      console.debug(
+        `Failed to read directory ${repoPath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
-    console.debug(`Found dependency files: ${foundFiles.join(", ") || "None"}`);
+    const displayFiles =
+      foundFiles.length > 0
+        ? foundFiles.join(", ")
+        : "None - checked paths: " +
+          searchPaths.map(p => p.replace(repoPath, "")).join(", ");
+    console.debug(`Found dependency files: ${displayFiles}`);
     const result = [...dependencies];
     console.debug(`Total dependencies extracted: ${result.length}`);
 
