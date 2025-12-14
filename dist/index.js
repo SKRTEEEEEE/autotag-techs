@@ -31668,6 +31668,7 @@ class DependencyParser {
         const foundFiles = [];
         // Search all paths for dependency files
         for (const searchPath of searchPaths) {
+            console.debug(`Checking directory: ${searchPath}`);
             for (const depFile of this.dependencyFiles) {
                 try {
                     const filePath = external_node_path_default().join(searchPath, depFile.name);
@@ -31678,9 +31679,13 @@ class DependencyParser {
                     for (const dep of deps)
                         dependencies.add(dep);
                 }
-                catch {
-                    // File doesn't exist or can't be read, skip
-                    // No console.debug here to avoid spam, but we could enable if needed
+                catch (error) {
+                    // File doesn't exist or can't be read, log it for debugging
+                    const errorMsg = error instanceof Error ? error.message : String(error);
+                    if (!errorMsg.includes("ENOENT")) {
+                        // Only log non-"file not found" errors
+                        console.debug(`Error reading ${depFile.name}: ${errorMsg.substring(0, 100)}`);
+                    }
                 }
             }
         }
