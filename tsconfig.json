@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es6",                         /* ES5 es la versión más antigua compatible */
+    "module": "commonjs",                    /* Usa CommonJS para compatibilidad con Node.js */
+    "outDir": "./dist",                      /* Carpeta de salida para los archivos compilados */
+    "rootDir": "./src",                      /* Carpeta raíz de los archivos fuente */
+    "strict": true,                          /* Habilitar todas las comprobaciones estrictas */
+    "esModuleInterop": true,                 /* Habilitar interoperabilidad de ES módulos */
+    "skipLibCheck": true,                    /* Omitir comprobación de tipos de archivos de declaración */
+    "forceConsistentCasingInFileNames": true /* Enforzar consistencia en nombres de archivos */
+  },
+  "include": ["src"],                        /* Incluir todos los archivos dentro de 'src' */
+  "exclude": ["node_modules"]                /* Excluir la carpeta 'node_modules' */
+}
