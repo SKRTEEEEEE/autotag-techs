@@ -53,9 +53,6 @@ export class DependencyParser {
   async parseDependencies(repoPath: string): Promise<string[]> {
     const dependencies = new Set<string>();
 
-    // First, check if the repository path exists and log what we find
-    console.debug(`Parsing dependencies from: ${repoPath}`);
-
     // Check for common dependency file patterns in root and subdirectories
     const searchPaths = [
       repoPath, // Root directory
@@ -70,29 +67,22 @@ export class DependencyParser {
 
     // Search all paths for dependency files
     for (const searchPath of searchPaths) {
-      console.debug(`Checking directory: ${searchPath}`);
       for (const depFile of this.dependencyFiles) {
+        const filePath = path.join(searchPath, depFile.name);
         try {
-          const filePath = path.join(searchPath, depFile.name);
           const content = await readFile(filePath, "utf8");
           const deps = depFile.parser(content);
 
           foundFiles.push(filePath);
-          console.debug(
-            `Found ${depFile.name} at ${filePath} with ${deps.length} dependencies`,
-          );
 
           for (const dep of deps) dependencies.add(dep);
         } catch (error) {
-          // File doesn't exist or can't be read, log it for debugging
-          const errorMsg =
-            error instanceof Error ? error.message : String(error);
-          if (!errorMsg.includes("ENOENT")) {
-            // Only log non-"file not found" errors
-            console.debug(
-              `Error reading ${depFile.name}: ${errorMsg.slice(0, 100)}`,
-            );
-          }
+          // Ignore file read errors - the file may not exist or may not be readable
+          // We'll just skip it and continue checking other paths
+          // eslint-disable-next-line no-console
+          console.debug(
+            `Skipping ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     }
@@ -112,32 +102,17 @@ export class DependencyParser {
             const content = await readFile(subPackagePath, "utf8");
             const deps = this.parsePackageJson(content);
             foundFiles.push(subPackagePath);
-            console.debug(
-              `Found package.json in subdirectory ${entry.name}/ with ${deps.length} dependencies`,
-            );
             for (const dep of deps) dependencies.add(dep);
           } catch {
             // Not found or can't read, skip
           }
         }
       }
-    } catch (error) {
-      // Failed to read directory, log it
-      console.debug(
-        `Failed to read directory ${repoPath}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    } catch {
+      // Failed to read directory, skip
     }
 
-    const displayFiles =
-      foundFiles.length > 0
-        ? foundFiles.join(", ")
-        : "None - checked paths: " +
-          searchPaths.map(p => p.replace(repoPath, "")).join(", ");
-    console.debug(`Found dependency files: ${displayFiles}`);
-    const result = [...dependencies];
-    console.debug(`Total dependencies extracted: ${result.length}`);
-
-    return result;
+    return [...dependencies];
   }
 
   private parsePackageJson(content: string): string[] {
