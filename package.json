@@ -40,7 +40,7 @@
     "typos": "bash scripts/check_typos.sh"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
+    "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^19.8.1",
     "@commitlint/types": "^19.8.1",
     "@swc/cli": "^0.7.9",
