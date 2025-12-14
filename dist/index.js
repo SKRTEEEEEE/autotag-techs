@@ -31930,8 +31930,45 @@ class TechDetector {
             try {
                 this.logger.info(`Searching for technology: ${tech}`);
                 const results = await this.searchTechnology(tech);
+                // Common programming languages and technologies should always be accepted
+                const commonLanguages = [
+                    "typescript",
+                    "javascript",
+                    "nodejs",
+                    "node",
+                    "python",
+                    "java",
+                    "go",
+                    "rust",
+                    "csharp",
+                    "php",
+                    "ruby",
+                    "kotlin",
+                    "swift",
+                    "scala",
+                    "groovy",
+                    "clojure",
+                    "elixir",
+                    "erlang",
+                    "haskell",
+                    "lua",
+                    "perl",
+                    "bash",
+                    "shell",
+                    "powershell",
+                    "html",
+                    "css",
+                    "sql",
+                    "r",
+                ];
+                const isCommonTech = commonLanguages.includes(tech.toLowerCase());
                 if (results.length > 0) {
                     this.logger.info(`Found ${results.length} match(es) for ${tech}: ${results.map(r => r.title).join(", ")}`);
+                    const normalized = this.normalizeTopic(tech);
+                    matchedTechs.push(normalized);
+                }
+                else if (isCommonTech) {
+                    this.logger.info(`${tech} is a known common technology, adding it`);
                     const normalized = this.normalizeTopic(tech);
                     matchedTechs.push(normalized);
                 }
@@ -31990,6 +32027,48 @@ class TechDetector {
         const cached = this.searchCache.get(query);
         if (cached) {
             return cached;
+        }
+        // Common technology names that should return empty array but be accepted as valid techs
+        const commonTechs = {
+            typescript: true,
+            javascript: true,
+            nodejs: true,
+            node: true,
+            python: true,
+            java: true,
+            go: true,
+            rust: true,
+            csharp: true,
+            "c#": true,
+            cpp: true,
+            "c++": true,
+            php: true,
+            ruby: true,
+            kotlin: true,
+            swift: true,
+            "objective-c": true,
+            "objective c": true,
+            scala: true,
+            groovy: true,
+            clojure: true,
+            elixir: true,
+            erlang: true,
+            haskell: true,
+            lua: true,
+            perl: true,
+            bash: true,
+            shell: true,
+            powershell: true,
+            html: true,
+            css: true,
+            sql: true,
+            r: true,
+        };
+        // Check if it's a common tech
+        if (commonTechs[query.toLowerCase()]) {
+            this.logger.info(`${query} is a known common technology`);
+            this.searchCache.set(query, []);
+            return [];
         }
         try {
             const url = `${this.apiBaseUrl}?q=${encodeURIComponent(query)}`;
