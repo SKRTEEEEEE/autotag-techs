@@ -31846,12 +31846,47 @@ class GitHubTopicsManager {
     }
 }
 
+;// CONCATENATED MODULE: external "node:fs"
+const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
 ;// CONCATENATED MODULE: ./src/tech-detector/tech-detector.ts
+
+
 class TechDetector {
     dependencyParser;
     topicsManager;
     logger;
     apiBaseUrl = "https://kind-creation-production.up.railway.app/pre-tech";
+    languageExtensions = {
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".js": "javascript",
+        ".jsx": "javascript",
+        ".py": "python",
+        ".java": "java",
+        ".c": "c",
+        ".cpp": "cpp",
+        ".cs": "csharp",
+        ".php": "php",
+        ".rb": "ruby",
+        ".go": "go",
+        ".rs": "rust",
+        ".swift": "swift",
+        ".kt": "kotlin",
+        ".scala": "scala",
+        ".sh": "bash",
+        ".html": "html",
+        ".css": "css",
+        ".scss": "scss",
+        ".vue": "vue",
+        ".json": "json",
+        ".xml": "xml",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".sql": "sql",
+        ".r": "r",
+        ".m": "objc",
+        ".groovy": "groovy",
+    };
     constructor(dependencyParser, topicsManager, logger) {
         this.dependencyParser = dependencyParser;
         this.topicsManager = topicsManager;
@@ -31859,26 +31894,32 @@ class TechDetector {
     }
     async detectAndTag(repoPath, includeFull) {
         this.logger.info("Starting technology detection...");
+        // Get dependencies from dependency files
         const dependencies = await this.dependencyParser.parseDependencies(repoPath);
         this.logger.info(`Found ${dependencies.length} dependencies`);
+        // Detect technologies from file extensions
+        const detectedLanguages = this.detectLanguages(repoPath);
+        this.logger.info(`Detected ${detectedLanguages.length} languages`);
+        // Combine both sources
+        const allTechs = [...new Set([...dependencies, ...detectedLanguages])];
         const matchedTechs = [];
-        for (const dep of dependencies) {
+        for (const tech of allTechs) {
             try {
-                const results = await this.searchTechnology(dep);
+                const results = await this.searchTechnology(tech);
                 if (results.length > 0) {
-                    const normalized = this.normalizeTopic(dep);
+                    const normalized = this.normalizeTopic(tech);
                     matchedTechs.push(normalized);
                 }
                 else if (includeFull) {
-                    const normalized = this.normalizeTopic(dep);
+                    const normalized = this.normalizeTopic(tech);
                     matchedTechs.push(normalized);
                 }
             }
             catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                this.logger.info(`Could not verify technology ${dep}: ${errorMessage}`);
+                this.logger.info(`Could not verify technology ${tech}: ${errorMessage}`);
                 if (includeFull) {
-                    const normalized = this.normalizeTopic(dep);
+                    const normalized = this.normalizeTopic(tech);
                     matchedTechs.push(normalized);
                 }
             }
@@ -31892,6 +31933,52 @@ class TechDetector {
         this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
         await this.topicsManager.updateTopics(uniqueTechs);
         this.logger.info("Topics updated successfully");
+    }
+    detectLanguages(repoPath) {
+        const languages = new Set();
+        try {
+            const files = this.getAllFiles(repoPath);
+            for (const file of files) {
+                const ext = external_node_path_default().extname(file).toLowerCase();
+                const language = this.languageExtensions[ext];
+                if (language) {
+                    languages.add(language);
+                }
+            }
+        }
+        catch (error) {
+            this.logger.info(`Error detecting languages: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return [...languages];
+    }
+    getAllFiles(dir, fileList = [], depth = 0) {
+        // Limit recursion depth to avoid too much scanning
+        if (depth > 3) {
+            return fileList;
+        }
+        try {
+            const files = (0,external_node_fs_namespaceObject.readdirSync)(dir, { withFileTypes: true });
+            for (const file of files) {
+                // Skip node_modules, .git, and hidden directories
+                if (file.name.startsWith(".") ||
+                    file.name === "node_modules" ||
+                    file.name === "dist" ||
+                    file.name === "build") {
+                    continue;
+                }
+                const fullPath = external_node_path_default().join(dir, file.name);
+                if (file.isDirectory()) {
+                    this.getAllFiles(fullPath, fileList, depth + 1);
+                }
+                else {
+                    fileList.push(fullPath);
+                }
+            }
+        }
+        catch {
+            // Directory read error, skip
+        }
+        return fileList;
     }
     async searchTechnology(query) {
         try {
