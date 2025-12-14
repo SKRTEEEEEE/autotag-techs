@@ -1,7 +1,11 @@
+import { Octokit } from "@octokit/rest";
+
+import { DependencyParser } from "./dependency-parser/dependency-parser";
 import { Inputs } from "./inputs/inputs";
 import { Logger } from "./logger/logger";
 import { Outputs } from "./outputs/outputs";
-import { sleep } from "./utils/sleep";
+import { GitHubTopicsManager } from "./tech-detector/github-topics-manager";
+import { TechDetector } from "./tech-detector/tech-detector";
 
 export class Action {
   private readonly logger;
@@ -13,13 +17,46 @@ export class Action {
   }
 
   async run(inputs: Inputs) {
-    this.logger.info("Running github-action-nodejs-template");
-    const name = inputs.name ?? "World";
-    const message = `Hello ${name}`;
-    this.logger.info(message);
-    await sleep(3000);
-    this.logger.info("Change: 11");
-    this.outputs.save("message", message);
-    this.logger.info("Finished github-action-nodejs-template");
+    this.logger.info("Starting autotag-techs-action...");
+
+    const octokit = new Octokit({ auth: inputs.token });
+
+    const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
+    if (!owner || !repo) {
+      throw new Error("GITHUB_REPOSITORY environment variable is not set");
+    }
+
+    const repoPath = process.env.GITHUB_WORKSPACE ?? process.cwd();
+    this.logger.info(`Repository: ${owner}/${repo}`);
+    this.logger.info(`Workspace: ${repoPath}`);
+
+    const dependencyParser = new DependencyParser();
+    const topicsManager = new GitHubTopicsManager(
+      octokit,
+      owner,
+      repo,
+      this.logger,
+    );
+    const techDetector = new TechDetector(
+      dependencyParser,
+      topicsManager,
+      this.logger,
+    );
+
+    try {
+      const includeFull = inputs.full ?? false;
+      await techDetector.detectAndTag(repoPath, includeFull);
+
+      const dependencies = await dependencyParser.parseDependencies(repoPath);
+      this.outputs.saveDetectedTechs(dependencies);
+
+      this.logger.info("Action completed successfully");
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(`Action failed: ${error.message}`);
+        throw error;
+      }
+      throw new Error("Unknown error occurred");
+    }
   }
 }

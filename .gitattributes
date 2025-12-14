@@ -1,0 +1,16 @@
+# Normalizar fin de línea a LF en el repositorio
+* text=auto eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+.editorconfig text eol=lf
+.eslintrc text eol=lf
+.gitignore text eol=lf
+*.png binary
+*.jpg binary
