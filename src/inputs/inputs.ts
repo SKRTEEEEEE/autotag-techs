@@ -1,3 +1,4 @@
 export interface Inputs {
-  readonly name?: string;
+  readonly token: string;
+  readonly full?: boolean;
 }
