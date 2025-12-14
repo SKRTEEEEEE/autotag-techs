@@ -69,6 +69,8 @@ export class DependencyParser {
   ): Promise<void> {
     try {
       const entries = await readdir(dirPath, { withFileTypes: true });
+      // eslint-disable-next-line no-console
+      console.log(`  Scanning: ${dirPath} (${entries.length} entries)`);
 
       for (const entry of entries) {
         // Skip common directories that don't contain meaningful dependencies

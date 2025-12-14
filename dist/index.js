@@ -31680,6 +31680,8 @@ class DependencyParser {
     async searchDependencyFiles(dirPath, dependencies) {
         try {
             const entries = await (0,promises_namespaceObject.readdir)(dirPath, { withFileTypes: true });
+            // eslint-disable-next-line no-console
+            console.log(`  Scanning: ${dirPath} (${entries.length} entries)`);
             for (const entry of entries) {
                 // Skip common directories that don't contain meaningful dependencies
                 const skipDirs = [
@@ -31719,9 +31721,9 @@ class DependencyParser {
                                 dependencies.add(dep);
                             }
                         }
-                        catch (err) {
+                        catch (error) {
                             // eslint-disable-next-line no-console
-                            console.log(`  Failed to parse ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
+                            console.log(`  Failed to parse ${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
                         }
                     }
                 }
