@@ -38,11 +38,30 @@ export class GitHubTopicsManager {
   }
 
   private async setTopics(topics: string[]): Promise<void> {
-    await this.octokit.rest.repos.replaceAllTopics({
-      owner: this.owner,
-      repo: this.repo,
-      names: topics,
-    });
+    try {
+      await this.octokit.rest.repos.replaceAllTopics({
+        owner: this.owner,
+        repo: this.repo,
+        names: topics,
+      });
+      this.logger.info("Topics updated successfully");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage.includes("403") ||
+        errorMessage.includes("Resource not accessible")
+      ) {
+        this.logger.info(
+          `Warning: Could not update topics due to insufficient permissions. ` +
+            `The GITHUB_TOKEN may not have write access to repository metadata. ` +
+            `Consider using a Personal Access Token with 'repo' scope instead. ` +
+            `Error: ${errorMessage}`,
+        );
+      } else {
+        throw error;
+      }
+    }
   }
 
   private mergeTopics(current: string[], newTopics: string[]): string[] {
