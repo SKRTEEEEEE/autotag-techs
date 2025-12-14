@@ -1,8 +1,10 @@
 [files]
 extend-exclude = [
   "dist",
-  "docs/**/*.*.md",  # All .md files in subdirectories under docs/
-  "docs/task/**/*.md"  # Specific pattern for docs/task/ subdirectories
+  "docs/*/*.md",  # All .md files in immediate subdirectories under docs/
+  "docs*/**/*.md",  # All .md files in any nested subdirectories under docs/
+  "docs\\*\\*.md",  # Windows path format for immediate subdirectories
+  "docs\\*\\**\\*.md"  # Windows path format for nested subdirectories
 ]
 
 [default]
