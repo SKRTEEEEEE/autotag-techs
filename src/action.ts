@@ -1,4 +1,4 @@
-import { getOctokit } from "@actions/github";
+import { Octokit } from "@octokit/rest";
 
 import { DependencyParser } from "./dependency-parser/dependency-parser";
 import { Inputs } from "./inputs/inputs";
@@ -19,7 +19,7 @@ export class Action {
   async run(inputs: Inputs) {
     this.logger.info("Starting autotag-techs-action...");
 
-    const octokit = getOctokit(inputs.token);
+    const octokit = new Octokit({ auth: inputs.token });
 
     const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
     if (!owner || !repo) {

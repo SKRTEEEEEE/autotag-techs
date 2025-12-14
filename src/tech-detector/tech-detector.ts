@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+import type { Octokit } from "@octokit/rest";
 import type { DependencyParser } from "../dependency-parser/dependency-parser";
 import type { Logger } from "../logger/logger";
 import type { GitHubTopicsManager } from "./github-topics-manager";
@@ -17,7 +17,7 @@ export class TechDetector {
   private readonly delayMs = 500; // Delay between API requests
 
   constructor(
-    private readonly octokit: any,
+    private readonly octokit: Octokit,
     private readonly owner: string,
     private readonly repo: string,
     private readonly dependencyParser: DependencyParser,

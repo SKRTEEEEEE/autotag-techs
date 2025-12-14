@@ -54,7 +54,11 @@ export class DependencyParser {
     const dependencies = new Set<string>();
 
     // Recursively search for all dependency files in the entire repository
+    // eslint-disable-next-line no-console
+    console.log(`Searching for dependencies in: ${repoPath}`);
     await this.searchDependencyFiles(repoPath, dependencies);
+    // eslint-disable-next-line no-console
+    console.log(`Found dependencies: ${[...dependencies].join(", ")}`);
 
     return [...dependencies];
   }
@@ -99,14 +103,23 @@ export class DependencyParser {
           );
           if (depFile) {
             const filePath = path.join(dirPath, entry.name);
+            // eslint-disable-next-line no-console
+            console.log(`Found dependency file: ${filePath}`);
             try {
               const content = await readFile(filePath, "utf8");
               const deps = depFile.parser(content);
+              // eslint-disable-next-line no-console
+              console.log(
+                `  Parsed ${deps.length} deps from ${entry.name}: ${deps.join(", ")}`,
+              );
               for (const dep of deps) {
                 dependencies.add(dep);
               }
-            } catch {
-              // Silently skip files that can't be read
+            } catch (error) {
+              // eslint-disable-next-line no-console
+              console.log(
+                `  Failed to parse ${entry.name}: ${error instanceof Error ? error.message : String(error)}`,
+              );
             }
           }
         }
