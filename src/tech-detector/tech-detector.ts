@@ -99,7 +99,6 @@ export class TechDetector {
 
     this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
     await this.topicsManager.updateTopics(uniqueTechs);
-    this.logger.info("Topics updated successfully");
   }
 
   private async getLanguagesFromGitHub(): Promise<string[]> {

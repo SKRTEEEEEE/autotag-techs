@@ -25,7 +25,17 @@ export class GitHubTopicsManager {
       mergedTopics.splice(this.maxTopics);
     }
 
-    await this.setTopics(mergedTopics);
+    try {
+      await this.setTopics(mergedTopics);
+      this.logger.info("Topics updated successfully");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.info(
+        `Warning: Could not update repository topics: ${errorMessage}. Technologies were detected but not saved as topics.`,
+      );
+      // Don't throw - the action should succeed even if topics can't be updated
+    }
   }
 
   private async getCurrentTopics(): Promise<string[]> {

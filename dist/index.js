@@ -31863,7 +31863,15 @@ class GitHubTopicsManager {
             this.logger.info(`Topics exceed maximum of ${this.maxTopics}, truncating`);
             mergedTopics.splice(this.maxTopics);
         }
-        await this.setTopics(mergedTopics);
+        try {
+            await this.setTopics(mergedTopics);
+            this.logger.info("Topics updated successfully");
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.info(`Warning: Could not update repository topics: ${errorMessage}. Technologies were detected but not saved as topics.`);
+            // Don't throw - the action should succeed even if topics can't be updated
+        }
     }
     async getCurrentTopics() {
         const response = await this.octokit.rest.repos.getAllTopics({
@@ -31959,7 +31967,6 @@ class TechDetector {
         }
         this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
         await this.topicsManager.updateTopics(uniqueTechs);
-        this.logger.info("Topics updated successfully");
     }
     async getLanguagesFromGitHub() {
         try {
