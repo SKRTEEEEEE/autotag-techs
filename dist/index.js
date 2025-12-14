@@ -32056,11 +32056,26 @@ class TechDetector {
         }
     }
     normalizeTopic(name) {
+        // Extract the actual package name from scoped packages
+        // e.g., @types/jest -> jest, @babel/core -> babel/core
+        let normalized = name;
+        // Handle scoped packages like @types/jest
+        if (normalized.startsWith("@")) {
+            const parts = normalized.split("/");
+            // If it's a type definition (@types/*), use just the package name
+            if (parts[0] === "@types" && parts.length > 1) {
+                normalized = parts[1];
+            }
+            else if (parts.length > 1) {
+                // For other scoped packages, keep the scope and package
+                normalized = parts.slice(1).join("-");
+            }
+        }
         // Convert to lowercase and handle common patterns
-        let normalized = name
+        normalized = normalized
             .toLowerCase()
             // Handle common separators and special chars
-            .replaceAll(/[.@+#]/g, "-")
+            .replaceAll(/[.+#]/g, "-")
             // Replace underscores and spaces with hyphens
             .replaceAll(/[_\s]/g, "-")
             // Remove any character that's not alphanumeric or hyphen
