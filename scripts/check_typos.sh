@@ -79,5 +79,29 @@ convert_to_relative_paths() {
 
 check_typos_installed
 absolute_path_files=$(get_files "$@")
-# Use the typos config with --force-exclude to ensure docs/*/*.md files are excluded
-typos --force-exclude $absolute_path_files
+
+# Filter out files that should be excluded based on patterns
+# This is necessary because when specific files are passed to typos,
+# the exclude patterns in config file are ignored
+filtered_files=""
+for file in $absolute_path_files; do
+    # Skip typos config file itself
+    if [[ "$file" == *"_typos.toml" ]]; then
+        continue
+    fi
+    
+    # Skip .md files in docs subdirectories (any level deeper than root docs/)
+    if [[ "$file" == *.md ]] && [[ "$file" == */docs/*/*.md || "$file" == */docs/*/*/*.md ]]; then
+        continue
+    fi
+    
+    # Add file to filtered list if not excluded
+    filtered_files="$filtered_files $file"
+done
+
+# Only run typos if there are files to check
+if [ -n "$filtered_files" ]; then
+    typos $filtered_files
+else
+    echo "No files to check after applying exclusion filters."
+fi
