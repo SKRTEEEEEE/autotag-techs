@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface DependencyFile {
@@ -53,18 +53,75 @@ export class DependencyParser {
   async parseDependencies(repoPath: string): Promise<string[]> {
     const dependencies = new Set<string>();
 
-    for (const depFile of this.dependencyFiles) {
-      try {
-        const filePath = path.join(repoPath, depFile.name);
-        const content = await readFile(filePath, "utf8");
-        const deps = depFile.parser(content);
-        for (const dep of deps) dependencies.add(dep);
-      } catch {
-        // File doesn't exist, skip
+    // First, check if the repository path exists and log what we find
+    console.debug(`Parsing dependencies from: ${repoPath}`);
+
+    // Check for common dependency file patterns in root and subdirectories
+    const searchPaths = [
+      repoPath, // Root directory
+      path.join(repoPath, "frontend"), // Common frontend folder
+      path.join(repoPath, "backend"), // Common backend folder
+      path.join(repoPath, "src"), // Common source folder
+      path.join(repoPath, "client"), // Common client folder
+      path.join(repoPath, "server"), // Common server folder
+    ];
+
+    const foundFiles: string[] = [];
+
+    // Search all paths for dependency files
+    for (const searchPath of searchPaths) {
+      for (const depFile of this.dependencyFiles) {
+        try {
+          const filePath = path.join(searchPath, depFile.name);
+          const content = await readFile(filePath, "utf8");
+          const deps = depFile.parser(content);
+
+          foundFiles.push(filePath);
+          console.debug(
+            `Found ${depFile.name} at ${filePath} with ${deps.length} dependencies`,
+          );
+
+          for (const dep of deps) dependencies.add(dep);
+        } catch {
+          // File doesn't exist or can't be read, skip
+          // No console.debug here to avoid spam, but we could enable if needed
+        }
       }
     }
 
-    return [...dependencies];
+    // Additional check: try to find any package.json files in subdirectories
+    try {
+      const entries = await readdir(repoPath, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const subPackagePath = path.join(
+            repoPath,
+            entry.name,
+            "package.json",
+          );
+          try {
+            const content = await readFile(subPackagePath, "utf8");
+            const deps = this.parsePackageJson(content);
+            foundFiles.push(subPackagePath);
+            console.debug(
+              `Found package.json in subdirectory ${entry.name}/ with ${deps.length} dependencies`,
+            );
+            for (const dep of deps) dependencies.add(dep);
+          } catch {
+            // Not found or can't read, skip
+          }
+        }
+      }
+    } catch {
+      // Failed to read directory, skip
+    }
+
+    console.debug(`Found dependency files: ${foundFiles.join(", ") || "None"}`);
+    const result = [...dependencies];
+    console.debug(`Total dependencies extracted: ${result.length}`);
+
+    return result;
   }
 
   private parsePackageJson(content: string): string[] {
