@@ -1,9 +1,7 @@
+import type { Octokit } from "@octokit/rest";
 import type { DependencyParser } from "../dependency-parser/dependency-parser";
 import type { Logger } from "../logger/logger";
 import type { GitHubTopicsManager } from "./github-topics-manager";
-
-import { readdirSync } from "node:fs";
-import path from "node:path";
 
 interface SimpleIconTech {
   title: string;
@@ -14,39 +12,10 @@ export class TechDetector {
   private readonly apiBaseUrl =
     "https://kind-creation-production.up.railway.app/pre-tech";
 
-  private readonly languageExtensions: Record<string, string> = {
-    ".ts": "typescript",
-    ".tsx": "typescript",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".py": "python",
-    ".java": "java",
-    ".c": "c",
-    ".cpp": "cpp",
-    ".cs": "csharp",
-    ".php": "php",
-    ".rb": "ruby",
-    ".go": "go",
-    ".rs": "rust",
-    ".swift": "swift",
-    ".kt": "kotlin",
-    ".scala": "scala",
-    ".sh": "bash",
-    ".html": "html",
-    ".css": "css",
-    ".scss": "scss",
-    ".vue": "vue",
-    ".json": "json",
-    ".xml": "xml",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".sql": "sql",
-    ".r": "r",
-    ".m": "objc",
-    ".groovy": "groovy",
-  };
-
   constructor(
+    private readonly octokit: Octokit,
+    private readonly owner: string,
+    private readonly repo: string,
     private readonly dependencyParser: DependencyParser,
     private readonly topicsManager: GitHubTopicsManager,
     private readonly logger: Logger,
@@ -55,17 +24,16 @@ export class TechDetector {
   async detectAndTag(repoPath: string, includeFull: boolean): Promise<void> {
     this.logger.info("Starting technology detection...");
 
-    // Get dependencies from dependency files
     const dependencies =
       await this.dependencyParser.parseDependencies(repoPath);
     this.logger.info(`Found ${dependencies.length} dependencies`);
 
-    // Detect technologies from file extensions
-    const detectedLanguages = this.detectLanguages(repoPath);
-    this.logger.info(`Detected ${detectedLanguages.length} languages`);
+    const githubLanguages = await this.getLanguagesFromGitHub();
+    this.logger.info(
+      `Detected ${githubLanguages.length} languages from GitHub`,
+    );
 
-    // Combine both sources
-    const allTechs = [...new Set([...dependencies, ...detectedLanguages])];
+    const allTechs = [...new Set([...dependencies, ...githubLanguages])];
 
     const matchedTechs: string[] = [];
 
@@ -105,65 +73,29 @@ export class TechDetector {
     this.logger.info("Topics updated successfully");
   }
 
-  private detectLanguages(repoPath: string): string[] {
-    const languages = new Set<string>();
-
+  private async getLanguagesFromGitHub(): Promise<string[]> {
     try {
-      const files = this.getAllFiles(repoPath);
+      const response = await this.octokit.repos.listLanguages({
+        owner: this.owner,
+        repo: this.repo,
+      });
 
-      for (const file of files) {
-        const ext = path.extname(file).toLowerCase();
-        const language = this.languageExtensions[ext];
-        if (language) {
-          languages.add(language);
-        }
-      }
+      const languages = Object.keys(response.data).map(lang =>
+        lang
+          .toLowerCase()
+          .replaceAll(/\s+/g, "-")
+          .replaceAll("+", "-")
+          .replaceAll("#", ""),
+      );
+
+      this.logger.info(`GitHub languages: ${languages.join(", ")}`);
+      return languages;
     } catch (error) {
       this.logger.info(
-        `Error detecting languages: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not fetch languages from GitHub: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return [];
     }
-
-    return [...languages];
-  }
-
-  private getAllFiles(
-    dir: string,
-    fileList: string[] = [],
-    depth = 0,
-  ): string[] {
-    // Limit recursion depth to avoid too much scanning
-    if (depth > 3) {
-      return fileList;
-    }
-
-    try {
-      const files = readdirSync(dir, { withFileTypes: true });
-
-      for (const file of files) {
-        // Skip node_modules, .git, and hidden directories
-        if (
-          file.name.startsWith(".") ||
-          file.name === "node_modules" ||
-          file.name === "dist" ||
-          file.name === "build"
-        ) {
-          continue;
-        }
-
-        const fullPath = path.join(dir, file.name);
-
-        if (file.isDirectory()) {
-          this.getAllFiles(fullPath, fileList, depth + 1);
-        } else {
-          fileList.push(fullPath);
-        }
-      }
-    } catch {
-      // Directory read error, skip
-    }
-
-    return fileList;
   }
 
   private async searchTechnology(query: string): Promise<SimpleIconTech[]> {

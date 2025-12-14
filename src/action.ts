@@ -38,6 +38,9 @@ export class Action {
       this.logger,
     );
     const techDetector = new TechDetector(
+      octokit,
+      owner,
+      repo,
       dependencyParser,
       topicsManager,
       this.logger,

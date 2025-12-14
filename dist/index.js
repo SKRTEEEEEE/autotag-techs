@@ -31846,62 +31846,30 @@ class GitHubTopicsManager {
     }
 }
 
-;// CONCATENATED MODULE: external "node:fs"
-const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
 ;// CONCATENATED MODULE: ./src/tech-detector/tech-detector.ts
-
-
 class TechDetector {
+    octokit;
+    owner;
+    repo;
     dependencyParser;
     topicsManager;
     logger;
     apiBaseUrl = "https://kind-creation-production.up.railway.app/pre-tech";
-    languageExtensions = {
-        ".ts": "typescript",
-        ".tsx": "typescript",
-        ".js": "javascript",
-        ".jsx": "javascript",
-        ".py": "python",
-        ".java": "java",
-        ".c": "c",
-        ".cpp": "cpp",
-        ".cs": "csharp",
-        ".php": "php",
-        ".rb": "ruby",
-        ".go": "go",
-        ".rs": "rust",
-        ".swift": "swift",
-        ".kt": "kotlin",
-        ".scala": "scala",
-        ".sh": "bash",
-        ".html": "html",
-        ".css": "css",
-        ".scss": "scss",
-        ".vue": "vue",
-        ".json": "json",
-        ".xml": "xml",
-        ".yaml": "yaml",
-        ".yml": "yaml",
-        ".sql": "sql",
-        ".r": "r",
-        ".m": "objc",
-        ".groovy": "groovy",
-    };
-    constructor(dependencyParser, topicsManager, logger) {
+    constructor(octokit, owner, repo, dependencyParser, topicsManager, logger) {
+        this.octokit = octokit;
+        this.owner = owner;
+        this.repo = repo;
         this.dependencyParser = dependencyParser;
         this.topicsManager = topicsManager;
         this.logger = logger;
     }
     async detectAndTag(repoPath, includeFull) {
         this.logger.info("Starting technology detection...");
-        // Get dependencies from dependency files
         const dependencies = await this.dependencyParser.parseDependencies(repoPath);
         this.logger.info(`Found ${dependencies.length} dependencies`);
-        // Detect technologies from file extensions
-        const detectedLanguages = this.detectLanguages(repoPath);
-        this.logger.info(`Detected ${detectedLanguages.length} languages`);
-        // Combine both sources
-        const allTechs = [...new Set([...dependencies, ...detectedLanguages])];
+        const githubLanguages = await this.getLanguagesFromGitHub();
+        this.logger.info(`Detected ${githubLanguages.length} languages from GitHub`);
+        const allTechs = [...new Set([...dependencies, ...githubLanguages])];
         const matchedTechs = [];
         for (const tech of allTechs) {
             try {
@@ -31934,51 +31902,24 @@ class TechDetector {
         await this.topicsManager.updateTopics(uniqueTechs);
         this.logger.info("Topics updated successfully");
     }
-    detectLanguages(repoPath) {
-        const languages = new Set();
+    async getLanguagesFromGitHub() {
         try {
-            const files = this.getAllFiles(repoPath);
-            for (const file of files) {
-                const ext = external_node_path_default().extname(file).toLowerCase();
-                const language = this.languageExtensions[ext];
-                if (language) {
-                    languages.add(language);
-                }
-            }
+            const response = await this.octokit.repos.listLanguages({
+                owner: this.owner,
+                repo: this.repo,
+            });
+            const languages = Object.keys(response.data).map(lang => lang
+                .toLowerCase()
+                .replaceAll(/\s+/g, "-")
+                .replaceAll("+", "-")
+                .replaceAll("#", ""));
+            this.logger.info(`GitHub languages: ${languages.join(", ")}`);
+            return languages;
         }
         catch (error) {
-            this.logger.info(`Error detecting languages: ${error instanceof Error ? error.message : String(error)}`);
+            this.logger.info(`Could not fetch languages from GitHub: ${error instanceof Error ? error.message : String(error)}`);
+            return [];
         }
-        return [...languages];
-    }
-    getAllFiles(dir, fileList = [], depth = 0) {
-        // Limit recursion depth to avoid too much scanning
-        if (depth > 3) {
-            return fileList;
-        }
-        try {
-            const files = (0,external_node_fs_namespaceObject.readdirSync)(dir, { withFileTypes: true });
-            for (const file of files) {
-                // Skip node_modules, .git, and hidden directories
-                if (file.name.startsWith(".") ||
-                    file.name === "node_modules" ||
-                    file.name === "dist" ||
-                    file.name === "build") {
-                    continue;
-                }
-                const fullPath = external_node_path_default().join(dir, file.name);
-                if (file.isDirectory()) {
-                    this.getAllFiles(fullPath, fileList, depth + 1);
-                }
-                else {
-                    fileList.push(fullPath);
-                }
-            }
-        }
-        catch {
-            // Directory read error, skip
-        }
-        return fileList;
     }
     async searchTechnology(query) {
         try {
@@ -32036,7 +31977,7 @@ class Action {
         this.logger.info(`Workspace: ${repoPath}`);
         const dependencyParser = new DependencyParser();
         const topicsManager = new GitHubTopicsManager(octokit, owner, repo, this.logger);
-        const techDetector = new TechDetector(dependencyParser, topicsManager, this.logger);
+        const techDetector = new TechDetector(octokit, owner, repo, dependencyParser, topicsManager, this.logger);
         try {
             const includeFull = inputs.full ?? false;
             await techDetector.detectAndTag(repoPath, includeFull);
