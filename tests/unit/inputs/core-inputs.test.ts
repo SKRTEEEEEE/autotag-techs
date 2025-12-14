@@ -55,7 +55,7 @@ describe("CoreInputs", () => {
       const inputs = new CoreInputs();
 
       expect(() => inputs.token).toThrow(
-        "GitHub token is required. Either provide it as 'token' input or ensure GITHUB_TOKEN is available in the environment.",
+        "GitHub token is required. Either provide it as 'token' input or set GITHUB_TOKEN environment variable.",
       );
 
       // Restore process.env
