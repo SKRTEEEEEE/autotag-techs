@@ -7,8 +7,8 @@ branding:
 
 inputs:
   token:
-    description: 'GitHub token with repository write permissions'
-    required: true
+    description: 'GitHub token with repository write permissions (optional, uses GITHUB_TOKEN by default)'
+    required: false
   full:
     description: 'Include all detected technologies or only those available in the API'
     required: false

@@ -14,7 +14,7 @@ describe("CoreInputs", () => {
   });
 
   describe("token", () => {
-    it('should return the value of "token" input', () => {
+    it('should return the value of "token" input when provided', () => {
       const expectedToken = "test-token-value";
       (core.getInput as Mock).mockReturnValueOnce(expectedToken);
 
@@ -22,7 +22,44 @@ describe("CoreInputs", () => {
       const token = inputs.token;
 
       expect(token).toBe(expectedToken);
-      expect(core.getInput).toHaveBeenCalledWith("token", { required: true });
+      expect(core.getInput).toHaveBeenCalledWith("token", { required: false });
+    });
+
+    it("should return GITHUB_TOKEN when token input is not provided", () => {
+      const githubToken = "github-token-from-env";
+      (core.getInput as Mock).mockReturnValueOnce("");
+
+      // Mock process.env.GITHUB_TOKEN
+      const originalEnv = process.env;
+      process.env = { ...originalEnv, GITHUB_TOKEN: githubToken };
+
+      const inputs = new CoreInputs();
+      const token = inputs.token;
+
+      expect(token).toBe(githubToken);
+      expect(core.getInput).toHaveBeenCalledWith("token", { required: false });
+
+      // Restore process.env
+      process.env = originalEnv;
+    });
+
+    it("should throw error when neither token input nor GITHUB_TOKEN is provided", () => {
+      (core.getInput as Mock).mockReturnValueOnce("");
+
+      // Mock process.env without GITHUB_TOKEN
+      const originalEnv = process.env;
+      const envWithoutToken = { ...originalEnv };
+      delete envWithoutToken.GITHUB_TOKEN;
+      process.env = envWithoutToken;
+
+      const inputs = new CoreInputs();
+
+      expect(() => inputs.token).toThrow(
+        "GitHub token is required. Either provide it as 'token' input or ensure GITHUB_TOKEN is available in the environment.",
+      );
+
+      // Restore process.env
+      process.env = originalEnv;
     });
   });
 

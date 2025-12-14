@@ -32001,7 +32001,17 @@ const buildAction = () => {
 
 class CoreInputs {
     get token() {
-        return (0,core.getInput)("token", { required: true });
+        // Try to get token from input first, fallback to GITHUB_TOKEN environment variable
+        const inputToken = (0,core.getInput)("token", { required: false });
+        if (inputToken) {
+            return inputToken;
+        }
+        // Fallback to GITHUB_TOKEN from environment
+        const githubToken = process.env.GITHUB_TOKEN;
+        if (!githubToken) {
+            throw new Error("GitHub token is required. Either provide it as 'token' input or ensure GITHUB_TOKEN is available in the environment.");
+        }
+        return githubToken;
     }
     get full() {
         return (0,core.getBooleanInput)("full") || false;
