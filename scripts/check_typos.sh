@@ -90,6 +90,11 @@ for file in $absolute_path_files; do
         continue
     fi
     
+    # Skip dist/ directory files
+    if [[ "$file" == */dist/* || "$file" == dist/* || "$file" == *"/dist/"* ]]; then
+        continue
+    fi
+    
     # Skip .md files in docs subdirectories (any level deeper than root docs/)
     if [[ "$file" == *.md ]] && [[ "$file" == */docs/*/*.md || "$file" == */docs/*/*/*.md ]]; then
         continue
