@@ -53,66 +53,67 @@ export class DependencyParser {
   async parseDependencies(repoPath: string): Promise<string[]> {
     const dependencies = new Set<string>();
 
-    // Check for common dependency file patterns in root and subdirectories
-    const searchPaths = [
-      repoPath, // Root directory
-      path.join(repoPath, "frontend"), // Common frontend folder
-      path.join(repoPath, "backend"), // Common backend folder
-      path.join(repoPath, "src"), // Common source folder
-      path.join(repoPath, "client"), // Common client folder
-      path.join(repoPath, "server"), // Common server folder
-    ];
+    // Recursively search for all dependency files in the entire repository
+    await this.searchDependencyFiles(repoPath, dependencies);
 
-    const foundFiles: string[] = [];
+    return [...dependencies];
+  }
 
-    // Search all paths for dependency files
-    for (const searchPath of searchPaths) {
-      for (const depFile of this.dependencyFiles) {
-        const filePath = path.join(searchPath, depFile.name);
-        try {
-          const content = await readFile(filePath, "utf8");
-          const deps = depFile.parser(content);
-
-          foundFiles.push(filePath);
-
-          for (const dep of deps) dependencies.add(dep);
-        } catch (error) {
-          // Ignore file read errors - the file may not exist or may not be readable
-          // We'll just skip it and continue checking other paths
-          // eslint-disable-next-line no-console
-          console.debug(
-            `Skipping ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
-    }
-
-    // Additional check: try to find any package.json files in subdirectories
+  private async searchDependencyFiles(
+    dirPath: string,
+    dependencies: Set<string>,
+  ): Promise<void> {
     try {
-      const entries = await readdir(repoPath, { withFileTypes: true });
+      const entries = await readdir(dirPath, { withFileTypes: true });
 
       for (const entry of entries) {
+        // Skip common directories that don't contain meaningful dependencies
+        const skipDirs = [
+          "node_modules",
+          ".git",
+          ".github",
+          "dist",
+          "build",
+          "target",
+          ".venv",
+          "venv",
+          "__pycache__",
+          ".pytest_cache",
+          "vendor",
+          ".bundle",
+          "coverage",
+        ];
+
         if (entry.isDirectory()) {
-          const subPackagePath = path.join(
-            repoPath,
-            entry.name,
-            "package.json",
+          if (!skipDirs.includes(entry.name)) {
+            // Recursively search subdirectories
+            await this.searchDependencyFiles(
+              path.join(dirPath, entry.name),
+              dependencies,
+            );
+          }
+        } else if (entry.isFile()) {
+          // Check if this file is a dependency file we care about
+          const depFile = this.dependencyFiles.find(
+            df => df.name === entry.name,
           );
-          try {
-            const content = await readFile(subPackagePath, "utf8");
-            const deps = this.parsePackageJson(content);
-            foundFiles.push(subPackagePath);
-            for (const dep of deps) dependencies.add(dep);
-          } catch {
-            // Not found or can't read, skip
+          if (depFile) {
+            const filePath = path.join(dirPath, entry.name);
+            try {
+              const content = await readFile(filePath, "utf8");
+              const deps = depFile.parser(content);
+              for (const dep of deps) {
+                dependencies.add(dep);
+              }
+            } catch {
+              // Silently skip files that can't be read
+            }
           }
         }
       }
     } catch {
-      // Failed to read directory, skip
+      // Silently skip directories that can't be read (permission errors, etc)
     }
-
-    return [...dependencies];
   }
 
   private parsePackageJson(content: string): string[] {

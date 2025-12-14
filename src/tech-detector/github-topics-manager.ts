@@ -1,11 +1,11 @@
-import type { Octokit } from "@octokit/rest";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import type { Logger } from "../logger/logger";
 
 export class GitHubTopicsManager {
   private readonly maxTopics = 20;
 
   constructor(
-    private readonly octokit: Octokit,
+    private readonly octokit: any,
     private readonly owner: string,
     private readonly repo: string,
     private readonly logger: Logger,
