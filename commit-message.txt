@@ -1,0 +1,17 @@
+refactor: adapt template for Windows + Git Bash (Terminal de Git)
+
+- Refactor the template to be fully compatible with Windows using Git Bash terminal
+- Create comprehensive start.md guide with Windows-specific instructions
+- Update script commands to use bash instead of chmod which is not native to Windows
+- Replace all AlbertHernandez references with SKRTEEEEEE in:
+  - LICENSE.md (copyright)
+  - package.json (author, repo URLs)
+  - action.yml (author field)
+  - README.md (links, badges, and references)
+- Remove references to other templates from AlbertHernandez
+- Add Quick Start section to README.md referencing the new start.md guide
+- Update script messages to include Windows Git Bash installation instructions
+- Fix line ending issues for Windows compatibility
+
+CO-CREATED by Agent666 — ⟦ Product of SKRTEEEEEE ⟧
+Co-authored-by: Agent666 <agent666@skrte.ai>
