@@ -31851,7 +31851,7 @@ class TechDetector {
     dependencyParser;
     topicsManager;
     logger;
-    apiUrl = "https://kind-creation-production.up.railway.app/api";
+    apiBaseUrl = "https://kind-creation-production.up.railway.app/pre-tech";
     constructor(dependencyParser, topicsManager, logger) {
         this.dependencyParser = dependencyParser;
         this.topicsManager = topicsManager;
@@ -31861,47 +31861,58 @@ class TechDetector {
         this.logger.info("Starting technology detection...");
         const dependencies = await this.dependencyParser.parseDependencies(repoPath);
         this.logger.info(`Found ${dependencies.length} dependencies`);
-        const availableTechs = await this.fetchAvailableTechs();
-        this.logger.info(`Fetched ${availableTechs.length} technologies from API`);
-        const matchedTechs = this.matchTechnologies(dependencies, availableTechs, includeFull);
-        this.logger.info(`Matched ${matchedTechs.length} technologies`);
-        if (matchedTechs.length === 0) {
+        const matchedTechs = [];
+        for (const dep of dependencies) {
+            try {
+                const results = await this.searchTechnology(dep);
+                if (results.length > 0) {
+                    const normalized = this.normalizeTopic(dep);
+                    matchedTechs.push(normalized);
+                }
+                else if (includeFull) {
+                    const normalized = this.normalizeTopic(dep);
+                    matchedTechs.push(normalized);
+                }
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                this.logger.info(`Could not verify technology ${dep}: ${errorMessage}`);
+                if (includeFull) {
+                    const normalized = this.normalizeTopic(dep);
+                    matchedTechs.push(normalized);
+                }
+            }
+        }
+        const uniqueTechs = [...new Set(matchedTechs)];
+        this.logger.info(`Matched ${uniqueTechs.length} technologies`);
+        if (uniqueTechs.length === 0) {
             this.logger.info("No technologies matched, skipping topic update");
             return;
         }
-        const topics = matchedTechs.map(tech => this.normalizeTopic(tech));
-        this.logger.info(`Creating topics: ${topics.join(", ")}`);
-        await this.topicsManager.updateTopics(topics);
+        this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
+        await this.topicsManager.updateTopics(uniqueTechs);
         this.logger.info("Topics updated successfully");
     }
-    async fetchAvailableTechs() {
-        const response = await fetch(this.apiUrl);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch technologies: ${response.statusText}`);
+    async searchTechnology(query) {
+        try {
+            const url = `${this.apiBaseUrl}?q=${encodeURIComponent(query)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to search technology: ${response.statusText}`);
+            }
+            const contentType = response.headers.get("content-type");
+            if (!contentType?.includes("application/json")) {
+                throw new TypeError(`Expected JSON response, got ${contentType}`);
+            }
+            const data = (await response.json());
+            return data;
         }
-        const data = (await response.json());
-        return data.icons;
-    }
-    matchTechnologies(dependencies, availableTechs, includeFull) {
-        const matched = [];
-        const availableSlugs = new Set(availableTechs.map(tech => tech.slug));
-        const availableTitles = new Map(availableTechs.map(tech => [tech.title.toLowerCase(), tech.slug]));
-        for (const dep of dependencies) {
-            const normalized = this.normalizeTopic(dep);
-            if (availableSlugs.has(normalized)) {
-                matched.push(normalized);
-                continue;
+        catch (error) {
+            if (error instanceof SyntaxError) {
+                throw new TypeError("Failed to parse API response as JSON. The API might be down or returning invalid data.");
             }
-            const titleMatch = availableTitles.get(dep.toLowerCase());
-            if (titleMatch) {
-                matched.push(titleMatch);
-                continue;
-            }
-            if (includeFull) {
-                matched.push(normalized);
-            }
+            throw error;
         }
-        return [...new Set(matched)];
     }
     normalizeTopic(name) {
         return name

@@ -8,8 +8,8 @@ interface SimpleIconTech {
 }
 
 export class TechDetector {
-  private readonly apiUrl =
-    "https://kind-creation-production.up.railway.app/api";
+  private readonly apiBaseUrl =
+    "https://kind-creation-production.up.railway.app/pre-tech";
 
   constructor(
     private readonly dependencyParser: DependencyParser,
@@ -24,70 +24,66 @@ export class TechDetector {
       await this.dependencyParser.parseDependencies(repoPath);
     this.logger.info(`Found ${dependencies.length} dependencies`);
 
-    const availableTechs = await this.fetchAvailableTechs();
-    this.logger.info(`Fetched ${availableTechs.length} technologies from API`);
+    const matchedTechs: string[] = [];
 
-    const matchedTechs = this.matchTechnologies(
-      dependencies,
-      availableTechs,
-      includeFull,
-    );
-    this.logger.info(`Matched ${matchedTechs.length} technologies`);
+    for (const dep of dependencies) {
+      try {
+        const results = await this.searchTechnology(dep);
+        if (results.length > 0) {
+          const normalized = this.normalizeTopic(dep);
+          matchedTechs.push(normalized);
+        } else if (includeFull) {
+          const normalized = this.normalizeTopic(dep);
+          matchedTechs.push(normalized);
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.info(`Could not verify technology ${dep}: ${errorMessage}`);
+        if (includeFull) {
+          const normalized = this.normalizeTopic(dep);
+          matchedTechs.push(normalized);
+        }
+      }
+    }
 
-    if (matchedTechs.length === 0) {
+    const uniqueTechs = [...new Set(matchedTechs)];
+    this.logger.info(`Matched ${uniqueTechs.length} technologies`);
+
+    if (uniqueTechs.length === 0) {
       this.logger.info("No technologies matched, skipping topic update");
       return;
     }
 
-    const topics = matchedTechs.map(tech => this.normalizeTopic(tech));
-    this.logger.info(`Creating topics: ${topics.join(", ")}`);
-
-    await this.topicsManager.updateTopics(topics);
+    this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
+    await this.topicsManager.updateTopics(uniqueTechs);
     this.logger.info("Topics updated successfully");
   }
 
-  private async fetchAvailableTechs(): Promise<SimpleIconTech[]> {
-    const response = await fetch(this.apiUrl);
+  private async searchTechnology(query: string): Promise<SimpleIconTech[]> {
+    try {
+      const url = `${this.apiBaseUrl}?q=${encodeURIComponent(query)}`;
+      const response = await fetch(url);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch technologies: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to search technology: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
+        throw new TypeError(`Expected JSON response, got ${contentType}`);
+      }
+
+      const data = (await response.json()) as SimpleIconTech[];
+      return data;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new TypeError(
+          "Failed to parse API response as JSON. The API might be down or returning invalid data.",
+        );
+      }
+      throw error;
     }
-
-    const data = (await response.json()) as { icons: SimpleIconTech[] };
-    return data.icons;
-  }
-
-  private matchTechnologies(
-    dependencies: string[],
-    availableTechs: SimpleIconTech[],
-    includeFull: boolean,
-  ): string[] {
-    const matched: string[] = [];
-    const availableSlugs = new Set(availableTechs.map(tech => tech.slug));
-    const availableTitles = new Map(
-      availableTechs.map(tech => [tech.title.toLowerCase(), tech.slug]),
-    );
-
-    for (const dep of dependencies) {
-      const normalized = this.normalizeTopic(dep);
-
-      if (availableSlugs.has(normalized)) {
-        matched.push(normalized);
-        continue;
-      }
-
-      const titleMatch = availableTitles.get(dep.toLowerCase());
-      if (titleMatch) {
-        matched.push(titleMatch);
-        continue;
-      }
-
-      if (includeFull) {
-        matched.push(normalized);
-      }
-    }
-
-    return [...new Set(matched)];
   }
 
   private normalizeTopic(name: string): string {
