@@ -152,6 +152,12 @@ export class TechsStorage {
       }
     }
 
+    // Extract base package name from plugin/extension packages
+    // e.g., node-red-dashboard -> node-red, node-red-contrib-s7 -> node-red
+    if (normalized.startsWith("node-red-")) {
+      normalized = "node-red";
+    }
+
     // Convert . to dot or - as per requirements
     normalized = normalized
       .toLowerCase()
@@ -183,8 +189,10 @@ export class TechsStorage {
 
       const content = await readFile(this.techsJsonPath, "utf8");
 
-      // Try to get existing file to get its SHA
+      // Try to get existing file to get its SHA and compare content
       let sha: string | undefined;
+      let existingContent: string | undefined;
+
       try {
         const response = await this.octokit.repos.getContent({
           owner: this.owner,
@@ -195,6 +203,13 @@ export class TechsStorage {
         if ("sha" in response.data) {
           sha = response.data.sha;
         }
+
+        if ("content" in response.data) {
+          const content = response.data.content;
+          if (typeof content === "string") {
+            existingContent = Buffer.from(content, "base64").toString("utf8");
+          }
+        }
       } catch (error) {
         // File doesn't exist yet, which is fine
         if (error instanceof Error && error.message.includes("404")) {
@@ -202,7 +217,15 @@ export class TechsStorage {
         }
       }
 
-      // Create or update the file
+      // Check if content actually changed
+      if (existingContent && existingContent === content) {
+        this.logger.info(
+          "techs.json content unchanged, skipping GitHub API update",
+        );
+        return;
+      }
+
+      // Create or update the file only if content changed
       await this.octokit.repos.createOrUpdateFileContents({
         owner: this.owner,
         repo: this.repo,

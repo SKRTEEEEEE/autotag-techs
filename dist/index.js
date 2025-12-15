@@ -32042,6 +32042,11 @@ class TechsStorage {
                 normalized = parts.slice(1).join("-");
             }
         }
+        // Extract base package name from plugin/extension packages
+        // e.g., node-red-dashboard -> node-red, node-red-contrib-s7 -> node-red
+        if (normalized.startsWith("node-red-")) {
+            normalized = "node-red";
+        }
         // Convert . to dot or - as per requirements
         normalized = normalized
             .toLowerCase()
@@ -32068,8 +32073,9 @@ class TechsStorage {
                 return;
             }
             const content = await (0,promises_namespaceObject.readFile)(this.techsJsonPath, "utf8");
-            // Try to get existing file to get its SHA
+            // Try to get existing file to get its SHA and compare content
             let sha;
+            let existingContent;
             try {
                 const response = await this.octokit.repos.getContent({
                     owner: this.owner,
@@ -32079,6 +32085,9 @@ class TechsStorage {
                 if ("sha" in response.data) {
                     sha = response.data.sha;
                 }
+                if ("content" in response.data) {
+                    existingContent = Buffer.from(response.data.content, "base64").toString("utf8");
+                }
             }
             catch (error) {
                 // File doesn't exist yet, which is fine
@@ -32086,7 +32095,12 @@ class TechsStorage {
                     this.logger.info("techs.json does not exist yet, will create it");
                 }
             }
-            // Create or update the file
+            // Check if content actually changed
+            if (existingContent && existingContent === content) {
+                this.logger.info("techs.json content unchanged, skipping GitHub API update");
+                return;
+            }
+            // Create or update the file only if content changed
             await this.octokit.repos.createOrUpdateFileContents({
                 owner: this.owner,
                 repo: this.repo,
@@ -32460,8 +32474,19 @@ class ChangeDetector {
     async getCurrentDependenciesHash() {
         const dependencies = await this.dependencyParser.parseDependencies(this.repoPath);
         const dependenciesString = dependencies.sort().join(",");
-        // Simple hash function for dependency list
-        return this.simpleHash(dependenciesString);
+        // Also include techs.json content in hash to detect any changes
+        let techsJsonContent = "";
+        try {
+            techsJsonContent = await (0,promises_namespaceObject.readFile)(external_node_path_default().join(this.repoPath, ".github", "techs.json"), "utf8");
+        }
+        catch {
+            // techs.json might not exist yet
+            techsJsonContent = "";
+        }
+        // Combine both for comprehensive change detection
+        const combinedString = `${dependenciesString}|${techsJsonContent}`;
+        // Simple hash function for both dependency list and techs.json
+        return this.simpleHash(combinedString);
     }
     async getFileMtime(filePath) {
         try {

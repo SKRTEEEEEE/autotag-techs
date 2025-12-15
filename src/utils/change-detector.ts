@@ -91,8 +91,23 @@ export class ChangeDetector {
     );
     const dependenciesString = dependencies.sort().join(",");
 
-    // Simple hash function for dependency list
-    return this.simpleHash(dependenciesString);
+    // Also include techs.json content in hash to detect any changes
+    let techsJsonContent = "";
+    try {
+      techsJsonContent = await readFile(
+        path.join(this.repoPath, ".github", "techs.json"),
+        "utf8",
+      );
+    } catch {
+      // techs.json might not exist yet
+      techsJsonContent = "";
+    }
+
+    // Combine both for comprehensive change detection
+    const combinedString = `${dependenciesString}|${techsJsonContent}`;
+
+    // Simple hash function for both dependency list and techs.json
+    return this.simpleHash(combinedString);
   }
 
   private async getFileMtime(filePath: string): Promise<number> {
