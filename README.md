@@ -87,10 +87,10 @@ jobs:
 
 ## Inputs
 
-| name    | description                                   | required | default      |
-| ------- | --------------------------------------------- | -------- | ------------ |
-| `token` | <p>Name the action will use to say Hello.</p> | `true`   | NOT INCLUDED |
-| `full`  | <p>Name the action will use to say Hello.</p> | `false`  | `false`      |
+| name    | description                                                                 | required | default      |
+| ------- | --------------------------------------------------------------------------- | -------- | ------------ |
+| `token` | <p>GitHub token with repository write permissions</p>                       | `true`   | NOT INCLUDED |
+| `full`  | <p>Include all detected technologies or only those available in the API</p> | `false`  | `false`      |
 
 <!-- action-docs-inputs source="action.yml" -->
 
@@ -98,25 +98,37 @@ jobs:
 
 ## Outputs
 
-| name      | description                |
-| --------- | -------------------------- |
-| `message` | <p>Hello world message</p> |
+| name             | description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `detected_techs` | <p>List of technologies detected</p>                 |
+| `created_topics` | <p>List of topics created</p>                        |
+| `skip_message`   | <p>Message when action is skipped</p>                |
+| `skipped`        | <p>Boolean flag indicating if action was skipped</p> |
 
 <!-- action-docs-outputs source="action.yml" -->
 
-## `.github/techs.json` - **FUTURE**
+## `.github/techs.json`
 
-Below is a example of a techs.json archive.
+This file is automatically created and maintained by the action. It serves as a cache of detected technologies and persists user-defined technologies across runs.
 
-- user: techs words reserved
+**Format:** Each timestamp key contains an array of detected technologies (in `nameBadge` format), and the `user` array contains technologies that will always be included in GitHub Topics.
+
+Example:
 
 ```json
 {
   "user": ["nest-js", "nextjs", "tailwind-css"],
-  "15-12-2025-0043": ["shadcnui", "go"],
-  "18-12-2025-1728": ["radix-ui"]
+  "15-12-2025-14": ["shadcnui", "go"],
+  "18-12-2025-17": ["radix-ui"]
 }
 ```
+
+**Benefits:**
+
+- **Smart caching:** Detected technologies are stored with timestamps (DD-MM-YYYY-HH format)
+- **Performance optimized:** Avoids redundant API calls for already-detected techs
+- **Persistent tech tracking:** User-defined technologies persist across runs and won't be deleted
+- **User-defined techs support:** Use the `user` field to specify technologies that should always be included in Topics
 
 ## 😎 Contributing
 
