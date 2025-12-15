@@ -242,7 +242,6 @@ export class TechDetector {
         "vendor",
         ".bundle",
         "coverage",
-        ".github",
         "node-modules",
       ]);
 
@@ -256,6 +255,9 @@ export class TechDetector {
         } else if (entry.isFile()) {
           for (const { pattern, techs: patternTechs } of patterns) {
             if (pattern.test(entry.name)) {
+              this.logger.info(
+                `Found matching file: ${entry.name} (detected: ${patternTechs.join(", ")})`,
+              );
               for (const tech of patternTechs) {
                 techs.add(tech);
               }
@@ -263,8 +265,9 @@ export class TechDetector {
           }
         }
       }
-    } catch {
-      // Silently ignore errors during scanning
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.info(`Error scanning directory ${dirPath}: ${errorMsg}`);
     }
   }
 

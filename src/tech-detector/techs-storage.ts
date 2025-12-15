@@ -1,6 +1,6 @@
 import type { Logger } from "../logger/logger";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface TechsJson {
@@ -24,6 +24,7 @@ export class TechsStorage {
       const techs = JSON.parse(content) as TechsJson;
 
       // Ensure user field exists
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       techs.user ??= [];
 
       this.logger.info(
@@ -38,6 +39,10 @@ export class TechsStorage {
 
   async saveTechs(techs: TechsJson): Promise<void> {
     try {
+      // Ensure .github directory exists
+      const dirPath = path.dirname(this.techsJsonPath);
+      await mkdir(dirPath, { recursive: true });
+
       await writeFile(
         this.techsJsonPath,
         JSON.stringify(techs, undefined, 2),
@@ -46,9 +51,10 @@ export class TechsStorage {
       this.logger.info(
         `Saved techs.json with ${Object.keys(techs).length} entries`,
       );
-    } catch {
-      this.logger.error("Failed to save techs.json");
-      throw new Error("Failed to save techs.json");
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to save techs.json: ${errorMsg}`);
+      throw new Error(`Failed to save techs.json: ${errorMsg}`);
     }
   }
 
@@ -105,8 +111,9 @@ export class TechsStorage {
     }
 
     // Add user techs separately
-    if (!excludeUser) {
-      for (const t of techs.user ?? []) allTechs.add(t);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!excludeUser && techs.user) {
+      for (const t of techs.user) allTechs.add(t);
     }
 
     return allTechs;
