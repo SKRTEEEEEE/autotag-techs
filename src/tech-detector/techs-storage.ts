@@ -1,5 +1,6 @@
 import type { Logger } from "../logger/logger";
 
+import { execSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -168,5 +169,59 @@ export class TechsStorage {
     }
 
     return normalized;
+  }
+
+  commitAndPushTechs(): void {
+    try {
+      const relativeFilePath = path.relative(this.repoPath, this.techsJsonPath);
+
+      // Check if file is modified
+      try {
+        execSync("git diff --quiet HEAD", { cwd: this.repoPath });
+        // If no error, file is not modified
+        this.logger.info("No changes to commit");
+        return;
+      } catch {
+        // File is modified, proceed with commit
+      }
+
+      // Configure git if not already configured
+      try {
+        execSync("git config user.email", { cwd: this.repoPath });
+      } catch {
+        execSync('git config user.email "autotag-bot@github.com"', {
+          cwd: this.repoPath,
+        });
+      }
+
+      try {
+        execSync("git config user.name", { cwd: this.repoPath });
+      } catch {
+        execSync('git config user.name "Autotag Bot"', {
+          cwd: this.repoPath,
+        });
+      }
+
+      // Add techs.json to staging
+      execSync(`git add "${relativeFilePath}"`, { cwd: this.repoPath });
+
+      // Commit
+      execSync(
+        "git commit -m 'chore: update techs.json with detected technologies'",
+        {
+          cwd: this.repoPath,
+        },
+      );
+
+      // Push
+      execSync("git push", { cwd: this.repoPath });
+
+      this.logger.info("Successfully committed and pushed techs.json");
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.info(
+        `Could not commit techs.json (might already be committed): ${errorMsg}`,
+      );
+    }
   }
 }

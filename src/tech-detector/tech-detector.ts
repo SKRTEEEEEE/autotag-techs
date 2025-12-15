@@ -157,6 +157,9 @@ export class TechDetector {
     const finalTechs = [...new Set([...userTechs, ...uniqueTechs])];
     this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
     await this.topicsManager.updateTopics(finalTechs);
+
+    // Commit and push techs.json to persist changes
+    this.techsStorage.commitAndPushTechs();
   }
 
   private async getLanguagesFromGitHub(): Promise<string[]> {

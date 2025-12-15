@@ -31919,7 +31919,10 @@ class GitHubTopicsManager {
     }
 }
 
+;// CONCATENATED MODULE: external "node:child_process"
+const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
 ;// CONCATENATED MODULE: ./src/tech-detector/techs-storage.ts
+
 
 
 class TechsStorage {
@@ -31936,6 +31939,7 @@ class TechsStorage {
             const content = await (0,promises_namespaceObject.readFile)(this.techsJsonPath, "utf8");
             const techs = JSON.parse(content);
             // Ensure user field exists
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             techs.user ??= [];
             this.logger.info(`Loaded existing techs.json with ${Object.keys(techs).length} entries`);
             return techs;
@@ -32003,8 +32007,9 @@ class TechsStorage {
             }
         }
         // Add user techs separately
-        if (!excludeUser) {
-            for (const t of techs.user ?? [])
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (!excludeUser && techs.user) {
+            for (const t of techs.user)
                 allTechs.add(t);
         }
         return allTechs;
@@ -32052,6 +32057,49 @@ class TechsStorage {
             normalized = "unknown";
         }
         return normalized;
+    }
+    async commitAndPushTechs() {
+        try {
+            const relativeFilePath = external_node_path_default().relative(this.repoPath, this.techsJsonPath);
+            // Check if file is modified
+            try {
+                (0,external_node_child_process_namespaceObject.execSync)("git diff --quiet HEAD", { cwd: this.repoPath });
+                // If no error, file is not modified
+                this.logger.info("No changes to commit");
+                return;
+            }
+            catch {
+                // File is modified, proceed with commit
+            }
+            // Configure git if not already configured
+            try {
+                (0,external_node_child_process_namespaceObject.execSync)("git config user.email", { cwd: this.repoPath });
+            }
+            catch {
+                (0,external_node_child_process_namespaceObject.execSync)('git config user.email "autotag-bot@github.com"', {
+                    cwd: this.repoPath,
+                });
+            }
+            try {
+                (0,external_node_child_process_namespaceObject.execSync)("git config user.name", { cwd: this.repoPath });
+            }
+            catch {
+                (0,external_node_child_process_namespaceObject.execSync)('git config user.name "Autotag Bot"', { cwd: this.repoPath });
+            }
+            // Add techs.json to staging
+            (0,external_node_child_process_namespaceObject.execSync)(`git add "${relativeFilePath}"`, { cwd: this.repoPath });
+            // Commit
+            (0,external_node_child_process_namespaceObject.execSync)("git commit -m 'chore: update techs.json with detected technologies'", {
+                cwd: this.repoPath,
+            });
+            // Push
+            (0,external_node_child_process_namespaceObject.execSync)("git push", { cwd: this.repoPath });
+            this.logger.info("Successfully committed and pushed techs.json");
+        }
+        catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.logger.info(`Could not commit techs.json (might already be committed): ${errorMsg}`);
+        }
     }
 }
 
@@ -32168,6 +32216,8 @@ class TechDetector {
         const finalTechs = [...new Set([...userTechs, ...uniqueTechs])];
         this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
         await this.topicsManager.updateTopics(finalTechs);
+        // Commit and push techs.json to persist changes
+        await this.techsStorage.commitAndPushTechs();
     }
     async getLanguagesFromGitHub() {
         try {
