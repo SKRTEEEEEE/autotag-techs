@@ -1,4 +1,4 @@
-import { createMock } from "@/tests/utils/mock";
+import { createMock } from "@/tests/unit/utils/mock";
 
 import { Outputs } from "@/src/outputs/outputs";
 
@@ -15,6 +15,10 @@ export class OutputsMock implements Outputs {
 
   saveCreatedTopics(topics: string[]): void {
     this.mock.saveCreatedTopics(topics);
+  }
+
+  setSkipMessage(message: string): void {
+    this.mock.setSkipMessage(message);
   }
 
   assertSaveToHaveBeenCalledWith(name: string, value: unknown): void {

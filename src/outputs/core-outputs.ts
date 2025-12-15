@@ -14,4 +14,9 @@ export class CoreOutputs implements Outputs {
   saveCreatedTopics(topics: string[]): void {
     setOutput("created_topics", topics.join(","));
   }
+
+  setSkipMessage(message: string): void {
+    setOutput("skip_message", message);
+    setOutput("skipped", "true");
+  }
 }

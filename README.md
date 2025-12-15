@@ -2,7 +2,7 @@
   <a href="https://github.com/SKRTEEEEEE/github-action-nodejs-template" target="blank"><img src="images/logo.png" alt="Github Actions Logo" width="512" /></a>
 </p>
 
-<h1 align="center">⭐ Github Action Template ⭐</h1>
+<h1 align="center">⭐ Auto Tag Techs Github Action ⭐</h1>
 
 <p align="center">
   Template for new Github Actions based on Typescript with the Best Practices and Ready to be Released
@@ -27,7 +27,9 @@ Starting a new github action with NodeJS can be a bit frustrating, there are a l
 
 The main objective of this template is to provide a good base configuration for our NodeJS Github Actions that we can start using.
 
-## 🌟 What is including this template?
+## 🌟 What is including?
+
+### For Dev
 
 1. 👷 Use [SWC](https://swc.rs/) for running the tests of the GitHub Action.
 2. 🐶 Integration with [husky](https://typicode.github.io/husky/) to ensure we have good quality and conventions while we are developing like:
@@ -47,35 +49,48 @@ The main objective of this template is to provide a good base configuration for 
 8. 🐦‍🔥 Use of ESModules instead of CommonJS, which is the standard in JavaScript.
 9. 📦 Use of [pnpm](https://pnpm.io/) as package manager, which is faster and more efficient than npm or yarn.
 
+### For User
+
+1. 🐈‍⬛ Usage of local cache and controlled call (only when deps change) for fast action.
+
 ## 👀 Usage
+
+- ⛔ `.` is not allowed for 'Topics' names: _next.js, tailwind.css, .net_ - use -> _nextjs, tailwind-css, dotnet_
+  - **`.` -> `dot` or `-`**
+- 📄 `.github/techs.json` is used as source of true
+  - Use "user" (Array) camp, for specific name config: this will be auto included in 'Topics' and not deleted if not delete of this list.
 
 Below is a simple example of how to use this action after customization:
 
 ```yaml
-name: github-action-nodejs-template
+name: Autotag techs
 
 on:
   push:
+    branches:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  autotag:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout 🛬
-        uses: actions/checkout@v4
-      - name: Your customized action 🤩
-        uses: YOUR_USERNAME/YOUR_REPOSITORY@v0
+      - uses: actions/checkout@v4
+      - uses: SKRTEEEEEE/autotag-techs@main
         with:
-          name: "Your Name" # Optional input
+          token: ${{ secrets.AUTOTAG_TOKEN }}
 ```
 
 <!-- action-docs-inputs source="action.yml" -->
 
 ## Inputs
 
-| name   | description                                   | required | default |
-| ------ | --------------------------------------------- | -------- | ------- |
-| `name` | <p>Name the action will use to say Hello.</p> | `false`  | `World` |
+| name    | description                                                                 | required | default      |
+| ------- | --------------------------------------------------------------------------- | -------- | ------------ |
+| `token` | <p>GitHub token with repository write permissions</p>                       | `true`   | NOT INCLUDED |
+| `full`  | <p>Include all detected technologies or only those available in the API</p> | `false`  | `false`      |
 
 <!-- action-docs-inputs source="action.yml" -->
 
@@ -83,11 +98,37 @@ jobs:
 
 ## Outputs
 
-| name      | description                |
-| --------- | -------------------------- |
-| `message` | <p>Hello world message</p> |
+| name             | description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `detected_techs` | <p>List of technologies detected</p>                 |
+| `created_topics` | <p>List of topics created</p>                        |
+| `skip_message`   | <p>Message when action is skipped</p>                |
+| `skipped`        | <p>Boolean flag indicating if action was skipped</p> |
 
 <!-- action-docs-outputs source="action.yml" -->
+
+## `.github/techs.json`
+
+This file is automatically created and maintained by the action. It serves as a cache of detected technologies and persists user-defined technologies across runs.
+
+**Format:** Each timestamp key contains an array of detected technologies (in `nameBadge` format), and the `user` array contains technologies that will always be included in GitHub Topics.
+
+Example:
+
+```json
+{
+  "user": ["nest-js", "nextjs", "tailwind-css"],
+  "15-12-2025-14": ["shadcnui", "go"],
+  "18-12-2025-17": ["radix-ui"]
+}
+```
+
+**Benefits:**
+
+- **Smart caching:** Detected technologies are stored with timestamps (DD-MM-YYYY-HH format)
+- **Performance optimized:** Avoids redundant API calls for already-detected techs
+- **Persistent tech tracking:** User-defined technologies persist across runs and won't be deleted
+- **User-defined techs support:** Use the `user` field to specify technologies that should always be included in Topics
 
 ## 😎 Contributing
 

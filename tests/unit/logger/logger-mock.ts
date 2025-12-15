@@ -1,4 +1,4 @@
-import { createMock } from "@/tests/utils/mock";
+import { createMock } from "@/tests/unit/utils/mock";
 
 import { Logger } from "@/src/logger/logger";
 

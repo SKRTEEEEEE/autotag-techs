@@ -6,6 +6,7 @@ import { Logger } from "./logger/logger";
 import { Outputs } from "./outputs/outputs";
 import { GitHubTopicsManager } from "./tech-detector/github-topics-manager";
 import { TechDetector } from "./tech-detector/tech-detector";
+import { ChangeDetector } from "./utils/change-detector";
 
 export class Action {
   private readonly logger;
@@ -37,6 +38,22 @@ export class Action {
       repo,
       this.logger,
     );
+    const changeDetector = new ChangeDetector(
+      repoPath,
+      dependencyParser,
+      this.logger,
+    );
+
+    // Check if we need to run based on changes
+    const shouldRun = await changeDetector.shouldRun();
+    if (!shouldRun) {
+      this.logger.info("Action skipped due to no changes detected");
+      this.outputs.setSkipMessage(
+        "No changes detected in dependencies or techs.json since last run",
+      );
+      return;
+    }
+
     const techDetector = new TechDetector(
       octokit,
       owner,
@@ -44,6 +61,7 @@ export class Action {
       dependencyParser,
       topicsManager,
       this.logger,
+      repoPath,
     );
 
     try {
@@ -52,6 +70,9 @@ export class Action {
 
       const dependencies = await dependencyParser.parseDependencies(repoPath);
       this.outputs.saveDetectedTechs(dependencies);
+
+      // Save last run data to track next changes
+      await changeDetector.saveLastRunData();
 
       this.logger.info("Action completed successfully");
     } catch (error) {
