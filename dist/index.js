@@ -31919,19 +31919,22 @@ class GitHubTopicsManager {
     }
 }
 
-;// CONCATENATED MODULE: external "node:child_process"
-const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
 ;// CONCATENATED MODULE: ./src/tech-detector/techs-storage.ts
-
 
 
 class TechsStorage {
     repoPath;
     logger;
+    octokit;
+    owner;
+    repo;
     techsJsonPath;
-    constructor(repoPath, logger) {
+    constructor(repoPath, logger, octokit, owner, repo) {
         this.repoPath = repoPath;
         this.logger = logger;
+        this.octokit = octokit;
+        this.owner = owner;
+        this.repo = repo;
         this.techsJsonPath = external_node_path_default().join(repoPath, ".github", "techs.json");
     }
     async loadTechs() {
@@ -32058,51 +32061,46 @@ class TechsStorage {
         }
         return normalized;
     }
-    commitAndPushTechs() {
+    async commitAndPushTechs() {
         try {
-            const relativeFilePath = external_node_path_default().relative(this.repoPath, this.techsJsonPath);
-            // Configure git if not already configured
-            try {
-                (0,external_node_child_process_namespaceObject.execSync)("git config user.email", { cwd: this.repoPath });
-            }
-            catch {
-                (0,external_node_child_process_namespaceObject.execSync)('git config user.email "autotag-bot@github.com"', {
-                    cwd: this.repoPath,
-                });
-            }
-            try {
-                (0,external_node_child_process_namespaceObject.execSync)("git config user.name", { cwd: this.repoPath });
-            }
-            catch {
-                (0,external_node_child_process_namespaceObject.execSync)('git config user.name "Autotag Bot"', {
-                    cwd: this.repoPath,
-                });
-            }
-            // Add techs.json to staging (even if not modified, to ensure it gets committed)
-            (0,external_node_child_process_namespaceObject.execSync)(`git add "${relativeFilePath}"`, { cwd: this.repoPath });
-            // Check if there are actual changes
-            let hasChanges = false;
-            try {
-                (0,external_node_child_process_namespaceObject.execSync)("git diff --cached --quiet", { cwd: this.repoPath });
-            }
-            catch {
-                hasChanges = true;
-            }
-            if (!hasChanges) {
-                this.logger.info("No changes to techs.json");
+            if (!this.octokit || !this.owner || !this.repo) {
+                this.logger.info("Skipping GitHub API commit: octokit not available");
                 return;
             }
-            // Commit
-            (0,external_node_child_process_namespaceObject.execSync)("git commit -m 'chore: update techs.json with detected technologies'", {
-                cwd: this.repoPath,
+            const content = await (0,promises_namespaceObject.readFile)(this.techsJsonPath, "utf8");
+            // Try to get existing file to get its SHA
+            let sha;
+            try {
+                const response = await this.octokit.repos.getContent({
+                    owner: this.owner,
+                    repo: this.repo,
+                    path: ".github/techs.json",
+                });
+                if ("sha" in response.data) {
+                    sha = response.data.sha;
+                }
+            }
+            catch (error) {
+                // File doesn't exist yet, which is fine
+                if (error instanceof Error &&
+                    error.message.includes("404")) {
+                    this.logger.info("techs.json does not exist yet, will create it");
+                }
+            }
+            // Create or update the file
+            await this.octokit.repos.createOrUpdateFileContents({
+                owner: this.owner,
+                repo: this.repo,
+                path: ".github/techs.json",
+                message: "chore: update techs.json with detected technologies",
+                content: Buffer.from(content).toString("base64"),
+                sha,
             });
-            // Push
-            (0,external_node_child_process_namespaceObject.execSync)("git push", { cwd: this.repoPath });
-            this.logger.info("Successfully committed and pushed techs.json");
+            this.logger.info("Successfully pushed techs.json to GitHub");
         }
         catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            this.logger.info(`Warning: Could not commit techs.json: ${errorMsg}`);
+            this.logger.info(`Warning: Could not push techs.json: ${errorMsg}`);
         }
     }
 }
@@ -32131,7 +32129,7 @@ class TechDetector {
         this.topicsManager = topicsManager;
         this.logger = logger;
         this.repoPath = repoPath;
-        this.techsStorage = new TechsStorage(repoPath, logger);
+        this.techsStorage = new TechsStorage(repoPath, logger, octokit, owner, repo);
     }
     async detectAndTag(repoPath, includeFull) {
         this.logger.info("Starting technology detection...");
@@ -32221,7 +32219,7 @@ class TechDetector {
         this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
         await this.topicsManager.updateTopics(finalTechs);
         // Commit and push techs.json to persist changes
-        this.techsStorage.commitAndPushTechs();
+        await this.techsStorage.commitAndPushTechs();
     }
     async getLanguagesFromGitHub() {
         try {

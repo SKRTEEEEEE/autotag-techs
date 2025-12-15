@@ -32,7 +32,13 @@ export class TechDetector {
     private readonly logger: Logger,
     private readonly repoPath: string,
   ) {
-    this.techsStorage = new TechsStorage(repoPath, logger);
+    this.techsStorage = new TechsStorage(
+      repoPath,
+      logger,
+      octokit,
+      owner,
+      repo,
+    );
   }
 
   async detectAndTag(repoPath: string, includeFull: boolean): Promise<void> {
@@ -159,7 +165,7 @@ export class TechDetector {
     await this.topicsManager.updateTopics(finalTechs);
 
     // Commit and push techs.json to persist changes
-    this.techsStorage.commitAndPushTechs();
+    await this.techsStorage.commitAndPushTechs();
   }
 
   private async getLanguagesFromGitHub(): Promise<string[]> {
