@@ -146,9 +146,9 @@ export class TechDetector {
       );
     }
 
-    // Save new techs to techs.json
-    if (newTechs.length > 0) {
-      await this.techsStorage.addNewTechs(newTechs);
+    // Save only matched techs to techs.json (not all new techs)
+    if (uniqueTechs.length > 0) {
+      await this.techsStorage.addNewTechs(uniqueTechs);
     }
 
     // Update latest timestamp to keep record of recent usage

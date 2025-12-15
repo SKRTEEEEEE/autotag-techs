@@ -32082,8 +32082,7 @@ class TechsStorage {
             }
             catch (error) {
                 // File doesn't exist yet, which is fine
-                if (error instanceof Error &&
-                    error.message.includes("404")) {
+                if (error instanceof Error && error.message.includes("404")) {
                     this.logger.info("techs.json does not exist yet, will create it");
                 }
             }
@@ -32204,9 +32203,9 @@ class TechDetector {
         if (failedTechs.length > 0) {
             this.logger.info(`Failed to verify: ${failedTechs.slice(0, 5).join(", ")}${failedTechs.length > 5 ? "..." : ""}`);
         }
-        // Save new techs to techs.json
-        if (newTechs.length > 0) {
-            await this.techsStorage.addNewTechs(newTechs);
+        // Save only matched techs to techs.json (not all new techs)
+        if (uniqueTechs.length > 0) {
+            await this.techsStorage.addNewTechs(uniqueTechs);
         }
         // Update latest timestamp to keep record of recent usage
         await this.techsStorage.updateTimestamps();
