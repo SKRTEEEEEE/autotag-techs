@@ -3,6 +3,9 @@ import type { DependencyParser } from "../dependency-parser/dependency-parser";
 import type { Logger } from "../logger/logger";
 import type { GitHubTopicsManager } from "./github-topics-manager";
 
+import { readdir } from "node:fs/promises";
+import path from "node:path";
+
 import { TechsStorage } from "./techs-storage";
 
 interface SimpleIconTech {
@@ -61,7 +64,17 @@ export class TechDetector {
       `Detected ${githubLanguages.length} languages from GitHub`,
     );
 
-    const allTechs = [...new Set([...dependencies, ...githubLanguages])];
+    const fileBasedTechs = await this.detectTechnologiesByFiles(repoPath);
+    this.logger.info(
+      `Detected ${fileBasedTechs.length} technologies from files`,
+    );
+    if (fileBasedTechs.length > 0) {
+      this.logger.info(`File-based techs: ${fileBasedTechs.join(", ")}`);
+    }
+
+    const allTechs = [
+      ...new Set([...dependencies, ...githubLanguages, ...fileBasedTechs]),
+    ];
     this.logger.info(`Total unique technologies to check: ${allTechs.length}`);
 
     const matchedTechs: string[] = [];
@@ -168,6 +181,90 @@ export class TechDetector {
         `Could not fetch languages from GitHub: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
+    }
+  }
+
+  private async detectTechnologiesByFiles(repoPath: string): Promise<string[]> {
+    const techs = new Set<string>();
+
+    // Define technology detection patterns
+    const techPatterns: { pattern: RegExp; techs: string[] }[] = [
+      { pattern: /^Dockerfile(.*)/, techs: ["docker"] },
+      {
+        pattern: /^docker-compose(\.ya?ml)?$/,
+        techs: ["docker", "docker-compose"],
+      },
+      { pattern: /\.sql$/i, techs: ["sql"] },
+      { pattern: /^\.dockerignore$/, techs: ["docker"] },
+      { pattern: /^Makefile$/, techs: ["make"] },
+      { pattern: /^\.gitlab-ci\.ya?ml$/, techs: ["gitlab-ci"] },
+      { pattern: /^\.travis\.ya?ml$/, techs: ["travis-ci"] },
+      { pattern: /^\.github\/workflows\//, techs: ["github-actions"] },
+      { pattern: /^terraform\//i, techs: ["terraform"] },
+      { pattern: /\.tf$/, techs: ["terraform"] },
+      { pattern: /^k8s\//i, techs: ["kubernetes"] },
+      { pattern: /^kubernetes\//i, techs: ["kubernetes"] },
+      { pattern: /\.ya?ml$/i, techs: ["yaml"] },
+    ];
+
+    try {
+      await this.scanFilesForTechs(repoPath, techs, techPatterns);
+    } catch (error) {
+      this.logger.info(
+        `Error scanning files for technologies: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return [...techs];
+  }
+
+  private async scanFilesForTechs(
+    dirPath: string,
+    techs: Set<string>,
+    patterns: {
+      pattern: RegExp;
+      techs: string[];
+    }[],
+  ): Promise<void> {
+    try {
+      const entries = await readdir(dirPath, { withFileTypes: true });
+
+      const skipDirs = new Set([
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        "target",
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".pytest_cache",
+        "vendor",
+        ".bundle",
+        "coverage",
+        ".github",
+        "node-modules",
+      ]);
+
+      for (const entry of entries) {
+        if (entry.isDirectory() && !skipDirs.has(entry.name)) {
+          await this.scanFilesForTechs(
+            path.join(dirPath, entry.name),
+            techs,
+            patterns,
+          );
+        } else if (entry.isFile()) {
+          for (const { pattern, techs: patternTechs } of patterns) {
+            if (pattern.test(entry.name)) {
+              for (const tech of patternTechs) {
+                techs.add(tech);
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Silently ignore errors during scanning
     }
   }
 
