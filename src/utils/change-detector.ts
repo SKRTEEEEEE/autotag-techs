@@ -85,7 +85,7 @@ export class ChangeDetector {
     }
   }
 
-  private async getCurrentDependenciesHash(): Promise<string> {
+  async getCurrentDependenciesHash(): Promise<string> {
     const dependencies = await this.dependencyParser.parseDependencies(
       this.repoPath,
     );
