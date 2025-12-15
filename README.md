@@ -60,15 +60,13 @@ The main objective of this template is to provide a good base configuration for 
 - 📄 `.github/techs.json` is used as source of true
   - Use "user" (Array) camp, for specific name config: this will be auto included in 'Topics' and not deleted if not delete of this list.
 
-Below is a simple example of how to use this action after customization:
+Below is a simple example of how to use this action:
 
 ```yaml
-name: Autotag techs
+name: 🏷️ Autotag techs
 
 on:
   push:
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -78,9 +76,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: SKRTEEEEEE/autotag-techs@main
+      - uses: SKRTEEEEEE/autotag-techs@latest
         with:
-          token: ${{ secrets.AUTOTAG_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 <!-- action-docs-inputs source="action.yml" -->
