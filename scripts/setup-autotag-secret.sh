@@ -1,26 +1,33 @@
 #!/bin/bash
 
 # Script to automatically set up AUTOTAG_TOKEN secret in all GitHub repositories
-# Usage: ./setup-autotag-secret.sh <github-pat-token>
-
-set -e
+# Usage: ./setup-autotag-secret.sh [github-pat-token]
+# If no token provided, reads from .env file
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Check if token is provided
-if [ -z "$1" ]; then
-  echo -e "${RED}Error: GitHub PAT token is required${NC}"
-  echo "Usage: $0 <github-pat-token>"
-  echo ""
-  echo "Example:"
-  echo "  $0 <your-personal-access-token>"
-  exit 1
+# Try to get token from argument or .env file
+GITHUB_TOKEN="$1"
+
+if [ -z "$GITHUB_TOKEN" ]; then
+  # Try to load from .env file
+  if [ -f ".env" ]; then
+    GITHUB_TOKEN=$(grep "AUTOTAG_TOKEN" .env | cut -d'=' -f2 | xargs)
+  fi
 fi
 
-GITHUB_TOKEN="$1"
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo -e "${RED}Error: GitHub PAT token is required${NC}"
+  echo "Usage: $0 [github-pat-token]"
+  echo ""
+  echo "Options:"
+  echo "  1. Pass token as argument: $0 <your-token>"
+  echo "  2. Create .env file with: AUTOTAG_TOKEN=<your-token>"
+  exit 1
+fi
 
 # Validate token format (basic check)
 if ! [[ $GITHUB_TOKEN =~ ^ghp_ ]]; then
@@ -32,9 +39,9 @@ echo ""
 
 # Get list of repositories
 echo "Fetching repositories..."
-REPOS=$(gh repo list --json name,nameWithOwner -q '.[].nameWithOwner')
+mapfile -t REPOS < <(gh repo list --json name,nameWithOwner -q '.[].nameWithOwner')
 
-if [ -z "$REPOS" ]; then
+if [ ${#REPOS[@]} -eq 0 ]; then
   echo -e "${RED}Error: No repositories found or authentication failed${NC}"
   exit 1
 fi
@@ -44,7 +51,7 @@ FAIL_COUNT=0
 SKIP_COUNT=0
 
 # Create secret for each repository
-while IFS= read -r repo; do
+for repo in "${REPOS[@]}"; do
   echo -n "Processing $repo... "
   
   # Check if secret already exists
@@ -61,7 +68,7 @@ while IFS= read -r repo; do
       ((FAIL_COUNT++))
     fi
   fi
-done <<< "$REPOS"
+done
 
 echo ""
 echo -e "${GREEN}Summary:${NC}"

@@ -1,13 +1,35 @@
 # Script to automatically set up AUTOTAG_TOKEN secret in all GitHub repositories
-# Usage: .\setup-autotag-secret.ps1 -Token "<your-token>"
+# Usage: .\setup-autotag-secret.ps1 [-Token "<your-token>"]
+# If no token provided, reads from .env file
 
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$Token,
     
     [Parameter(Mandatory = $false)]
     [switch]$Force
 )
+
+# Try to load token from .env if not provided
+if ([string]::IsNullOrEmpty($Token)) {
+    if (Test-Path ".env") {
+        $envContent = Get-Content ".env"
+        $tokenLine = $envContent | Select-String "AUTOTAG_TOKEN"
+        if ($tokenLine) {
+            $Token = $tokenLine.Line.Split("=")[1].Trim()
+        }
+    }
+}
+
+if ([string]::IsNullOrEmpty($Token)) {
+    Write-Host "$RedError: GitHub PAT token is required$Reset"
+    Write-Host "Usage: $PSCommandPath [-Token '<your-token>']"
+    Write-Host ""
+    Write-Host "Options:"
+    Write-Host "  1. Pass token as parameter: -Token '<your-token>'"
+    Write-Host "  2. Create .env file with: AUTOTAG_TOKEN=<your-token>"
+    exit 1
+}
 
 # Colors for output
 $Green = "`e[32m"

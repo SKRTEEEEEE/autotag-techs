@@ -19,23 +19,37 @@ The `autotag-techs` action requires a GitHub token with administrative permissio
 
 ⚠️ **SECURITY WARNING**: Keep this token safe! It has significant permissions.
 
-## Step 2: Run the Setup Script
+## Step 2: Set up .env file
 
-Choose your operating system:
+Create a `.env` file in the project root with your token:
+
+```
+AUTOTAG_TOKEN = <your-token-here>
+```
+
+The `.env` file is already in `.gitignore`, so it won't be committed to version control.
+
+## Step 3: Run the Setup Script
+
+The script will automatically read the token from your `.env` file:
 
 ### On Linux/macOS:
 
 ```bash
-bash scripts/setup-autotag-secret.sh "<your-personal-access-token>"
+bash scripts/setup-autotag-secret.sh
 ```
 
 ### On Windows (PowerShell):
 
 ```powershell
-.\scripts\setup-autotag-secret.ps1 -Token "<your-personal-access-token>"
+.\scripts\setup-autotag-secret.ps1
 ```
 
-Replace `<your-personal-access-token>` with your actual PAT token created in Step 1.
+**Alternative:** You can also pass the token directly:
+
+```bash
+bash scripts/setup-autotag-secret.sh "your-token-here"
+```
 
 ### What the script does:
 
@@ -46,7 +60,7 @@ Replace `<your-personal-access-token>` with your actual PAT token created in Ste
    - Shows success/skip/failure status
 3. Displays a summary
 
-## Step 3: Update Your Workflows
+## Step 4: Update Your Workflows
 
 Once the script completes, update your workflow files to use the secret:
 
@@ -69,7 +83,7 @@ jobs:
           token: ${{ secrets.AUTOTAG_TOKEN }}
 ```
 
-## Verifying the Setup
+## Step 5: Verifying the Setup
 
 After running the script:
 
