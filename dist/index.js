@@ -25660,6 +25660,20 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:events"
 
 /***/ }),
 
+/***/ 1455:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs/promises");
+
+/***/ }),
+
+/***/ 6760:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
+
+/***/ }),
+
 /***/ 7075:
 /***/ ((module) => {
 
@@ -27607,6 +27621,36 @@ __webpack_unused_export__ = defaultContentType
 /******/ 	};
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/create fake namespace object */
+/******/ (() => {
+/******/ 	var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
+/******/ 	var leafPrototypes;
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 16: return value when it's Promise-like
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__nccwpck_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = this(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if(typeof value === 'object' && value) {
+/******/ 			if((mode & 4) && value.__esModule) return value;
+/******/ 			if((mode & 16) && typeof value.then === 'function') return value;
+/******/ 		}
+/******/ 		var ns = Object.create(null);
+/******/ 		__nccwpck_require__.r(ns);
+/******/ 		var def = {};
+/******/ 		leafPrototypes = leafPrototypes || [null, getProto({}), getProto([]), getProto(getProto)];
+/******/ 		for(var current = mode & 2 && value; typeof current == 'object' && !~leafPrototypes.indexOf(current); current = getProto(current)) {
+/******/ 			Object.getOwnPropertyNames(current).forEach((key) => (def[key] = () => (value[key])));
+/******/ 		}
+/******/ 		def['default'] = () => (value);
+/******/ 		__nccwpck_require__.d(ns, def);
+/******/ 		return ns;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/define property getters */
 /******/ (() => {
 /******/ 	// define getter functions for harmony exports
@@ -27622,6 +27666,17 @@ __webpack_unused_export__ = defaultContentType
 /******/ /* webpack/runtime/hasOwnProperty shorthand */
 /******/ (() => {
 /******/ 	__nccwpck_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ })();
+/******/ 
+/******/ /* webpack/runtime/make namespace object */
+/******/ (() => {
+/******/ 	// define __esModule on exports
+/******/ 	__nccwpck_require__.r = (exports) => {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
 /******/ })();
 /******/ 
 /******/ /* webpack/runtime/compat */
@@ -31616,11 +31671,11 @@ const dist_src_Octokit = Octokit.plugin(requestLog, legacyRestEndpointMethods, p
 );
 
 
-;// CONCATENATED MODULE: external "node:fs/promises"
-const promises_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs/promises");
-;// CONCATENATED MODULE: external "node:path"
-const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
-var external_node_path_default = /*#__PURE__*/__nccwpck_require__.n(external_node_path_namespaceObject);
+// EXTERNAL MODULE: external "node:fs/promises"
+var promises_ = __nccwpck_require__(1455);
+// EXTERNAL MODULE: external "node:path"
+var external_node_path_ = __nccwpck_require__(6760);
+var external_node_path_default = /*#__PURE__*/__nccwpck_require__.n(external_node_path_);
 ;// CONCATENATED MODULE: ./src/dependency-parser/dependency-parser.ts
 
 
@@ -31679,7 +31734,7 @@ class DependencyParser {
     }
     async searchDependencyFiles(dirPath, dependencies) {
         try {
-            const entries = await (0,promises_namespaceObject.readdir)(dirPath, { withFileTypes: true });
+            const entries = await (0,promises_.readdir)(dirPath, { withFileTypes: true });
             // eslint-disable-next-line no-console
             console.log(`  Scanning: ${dirPath} (${entries.length} entries)`);
             for (const entry of entries) {
@@ -31713,7 +31768,7 @@ class DependencyParser {
                         // eslint-disable-next-line no-console
                         console.log(`Found dependency file: ${filePath}`);
                         try {
-                            const content = await (0,promises_namespaceObject.readFile)(filePath, "utf8");
+                            const content = await (0,promises_.readFile)(filePath, "utf8");
                             const deps = depFile.parser(content);
                             // eslint-disable-next-line no-console
                             console.log(`  Parsed ${deps.length} deps from ${entry.name}: ${deps.join(", ")}`);
@@ -31933,12 +31988,10 @@ class TechsStorage {
     }
     async loadTechs() {
         try {
-            const content = await (0,promises_namespaceObject.readFile)(this.techsJsonPath, "utf8");
+            const content = await (0,promises_.readFile)(this.techsJsonPath, "utf8");
             const techs = JSON.parse(content);
             // Ensure user field exists
-            if (!techs.user) {
-                techs.user = [];
-            }
+            techs.user ??= [];
             this.logger.info(`Loaded existing techs.json with ${Object.keys(techs).length} entries`);
             return techs;
         }
@@ -31949,7 +32002,7 @@ class TechsStorage {
     }
     async saveTechs(techs) {
         try {
-            await (0,promises_namespaceObject.writeFile)(this.techsJsonPath, JSON.stringify(techs, undefined, 2), "utf8");
+            await (0,promises_.writeFile)(this.techsJsonPath, JSON.stringify(techs, undefined, 2), "utf8");
             this.logger.info(`Saved techs.json with ${Object.keys(techs).length} entries`);
         }
         catch {
@@ -32001,14 +32054,14 @@ class TechsStorage {
             }
         }
         // Add user techs separately
-        if (!excludeUser && techs.user) {
-            for (const t of techs.user)
+        if (!excludeUser) {
+            for (const t of techs.user ?? [])
                 allTechs.add(t);
         }
         return allTechs;
     }
     getUserTechs(techs) {
-        return techs.user ?? [];
+        return techs.user;
     }
     generateTimestamp() {
         const now = new Date();
@@ -32094,7 +32147,14 @@ class TechDetector {
         }
         const githubLanguages = await this.getLanguagesFromGitHub();
         this.logger.info(`Detected ${githubLanguages.length} languages from GitHub`);
-        const allTechs = [...new Set([...dependencies, ...githubLanguages])];
+        const fileBasedTechs = await this.detectTechnologiesByFiles(repoPath);
+        this.logger.info(`Detected ${fileBasedTechs.length} technologies from files`);
+        if (fileBasedTechs.length > 0) {
+            this.logger.info(`File-based techs: ${fileBasedTechs.join(", ")}`);
+        }
+        const allTechs = [
+            ...new Set([...dependencies, ...githubLanguages, ...fileBasedTechs]),
+        ];
         this.logger.info(`Total unique technologies to check: ${allTechs.length}`);
         const matchedTechs = [];
         const newTechs = [];
@@ -32175,6 +32235,73 @@ class TechDetector {
         catch (error) {
             this.logger.info(`Could not fetch languages from GitHub: ${error instanceof Error ? error.message : String(error)}`);
             return [];
+        }
+    }
+    async detectTechnologiesByFiles(repoPath) {
+        const techs = new Set();
+        // Define technology detection patterns
+        const techPatterns = [
+            { pattern: /^Dockerfile(.*)/, techs: ["docker"] },
+            {
+                pattern: /^docker-compose(\.ya?ml)?$/,
+                techs: ["docker", "docker-compose"],
+            },
+            { pattern: /\.sql$/i, techs: ["sql"] },
+            { pattern: /^\.dockerignore$/, techs: ["docker"] },
+            { pattern: /^Makefile$/, techs: ["make"] },
+            { pattern: /^\.gitlab-ci\.ya?ml$/, techs: ["gitlab-ci"] },
+            { pattern: /^\.travis\.ya?ml$/, techs: ["travis-ci"] },
+            { pattern: /^\.github\/workflows\//, techs: ["github-actions"] },
+            { pattern: /^terraform\//i, techs: ["terraform"] },
+            { pattern: /\.tf$/, techs: ["terraform"] },
+            { pattern: /^k8s\//i, techs: ["kubernetes"] },
+            { pattern: /^kubernetes\//i, techs: ["kubernetes"] },
+            { pattern: /\.ya?ml$/i, techs: ["yaml"] },
+        ];
+        try {
+            await this.scanFilesForTechs(repoPath, techs, techPatterns);
+        }
+        catch (error) {
+            this.logger.info(`Error scanning files for technologies: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return [...techs];
+    }
+    async scanFilesForTechs(dirPath, techs, patterns) {
+        try {
+            const { readdir } = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 1455, 23));
+            const entries = await readdir(dirPath, { withFileTypes: true });
+            const skipDirs = [
+                "node_modules",
+                ".git",
+                "dist",
+                "build",
+                "target",
+                ".venv",
+                "venv",
+                "__pycache__",
+                ".pytest_cache",
+                "vendor",
+                ".bundle",
+                "coverage",
+                ".github",
+                "node-modules",
+            ];
+            for (const entry of entries) {
+                if (entry.isDirectory() && !skipDirs.includes(entry.name)) {
+                    const { default: path } = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 23));
+                    await this.scanFilesForTechs(path.join(dirPath, entry.name), techs, patterns);
+                }
+                else if (entry.isFile()) {
+                    for (const { pattern, techs: patternTechs } of patterns) {
+                        if (pattern.test(entry.name)) {
+                            patternTechs.forEach(tech => techs.add(tech));
+                        }
+                    }
+                }
+            }
+        }
+        catch (error) {
+            // Silently ignore errors during scanning
         }
     }
     async searchTechnology(query, retries = 3) {
@@ -32310,7 +32437,7 @@ class ChangeDetector {
                 timestamp: new Date().toISOString(),
             };
             const content = JSON.stringify(lastRunData, undefined, 2);
-            await (0,promises_namespaceObject.writeFile)(this.lastRunFile, content, "utf8");
+            await (0,promises_.writeFile)(this.lastRunFile, content, "utf8");
             this.logger.info(`Saved last run data with hash: ${depsHash}`);
         }
         catch (error) {
@@ -32320,7 +32447,7 @@ class ChangeDetector {
     }
     async loadLastRunData() {
         try {
-            const content = await (0,promises_namespaceObject.readFile)(this.lastRunFile, "utf8");
+            const content = await (0,promises_.readFile)(this.lastRunFile, "utf8");
             return JSON.parse(content);
         }
         catch {
@@ -32335,7 +32462,7 @@ class ChangeDetector {
     }
     async getFileMtime(filePath) {
         try {
-            const stats = await (0,promises_namespaceObject.stat)(filePath);
+            const stats = await (0,promises_.stat)(filePath);
             return stats.mtime.getTime();
         }
         catch {
