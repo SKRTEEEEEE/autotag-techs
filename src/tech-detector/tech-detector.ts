@@ -3,6 +3,8 @@ import type { DependencyParser } from "../dependency-parser/dependency-parser";
 import type { Logger } from "../logger/logger";
 import type { GitHubTopicsManager } from "./github-topics-manager";
 
+import { TechsStorage } from "./techs-storage";
+
 interface SimpleIconTech {
   title: string;
   slug: string;
@@ -16,6 +18,8 @@ export class TechDetector {
 
   private readonly delayMs = 500; // Delay between API requests
 
+  private readonly techsStorage: TechsStorage;
+
   constructor(
     private readonly octokit: Octokit,
     private readonly owner: string,
@@ -23,10 +27,25 @@ export class TechDetector {
     private readonly dependencyParser: DependencyParser,
     private readonly topicsManager: GitHubTopicsManager,
     private readonly logger: Logger,
-  ) {}
+    private readonly repoPath: string,
+  ) {
+    this.techsStorage = new TechsStorage(repoPath, logger);
+  }
 
   async detectAndTag(repoPath: string, includeFull: boolean): Promise<void> {
     this.logger.info("Starting technology detection...");
+
+    // Load existing techs from storage
+    const existingTechs = await this.techsStorage.loadTechs();
+    const userTechs = this.techsStorage.getUserTechs(existingTechs);
+
+    // First, update topics with user-defined techs (always included)
+    if (userTechs.length > 0) {
+      this.logger.info(
+        `Including user-defined technologies: ${userTechs.join(", ")}`,
+      );
+      await this.topicsManager.updateTopics(userTechs);
+    }
 
     const dependencies =
       await this.dependencyParser.parseDependencies(repoPath);
@@ -46,11 +65,30 @@ export class TechDetector {
     this.logger.info(`Total unique technologies to check: ${allTechs.length}`);
 
     const matchedTechs: string[] = [];
+    const newTechs: string[] = [];
     const failedTechs: string[] = [];
 
     for (const [i, tech] of allTechs.entries()) {
+      // Normalize to badge format for checking if it exists in techs.json
+      const normalizedBadge = this.techsStorage.normalizeToBadge(tech);
+
+      // Check if tech already exists in techs.json
+      if (await this.techsStorage.hasTech(normalizedBadge)) {
+        this.logger.info(
+          `Technology ${tech} (${normalizedBadge}) already exists in techs.json, skipping API call`,
+        );
+        matchedTechs.push(normalizedBadge);
+        continue;
+      }
+
+      // Tech not found in techs.json, need to call API
+      this.logger.info(
+        `New technology ${tech} (${normalizedBadge}), checking via API...`,
+      );
+      newTechs.push(normalizedBadge);
+
       // Add delay between API calls to avoid rate limiting
-      if (i > 0) {
+      if (i > 0 || matchedTechs.length > 0) {
         await this.sleep(this.delayMs);
       }
 
@@ -61,13 +99,11 @@ export class TechDetector {
           this.logger.info(
             `Found ${results.length} match(es) for ${tech}: ${results.map(r => r.title).join(", ")}`,
           );
-          const normalized = this.normalizeTopic(tech);
-          matchedTechs.push(normalized);
+          matchedTechs.push(normalizedBadge);
         } else {
           this.logger.info(`No API matches for ${tech}`);
           if (includeFull) {
-            const normalized = this.normalizeTopic(tech);
-            matchedTechs.push(normalized);
+            matchedTechs.push(normalizedBadge);
           }
         }
       } catch (error) {
@@ -78,8 +114,7 @@ export class TechDetector {
         );
         failedTechs.push(tech);
         if (includeFull) {
-          const normalized = this.normalizeTopic(tech);
-          matchedTechs.push(normalized);
+          matchedTechs.push(normalizedBadge);
         }
       }
     }
@@ -92,13 +127,23 @@ export class TechDetector {
       );
     }
 
+    // Save new techs to techs.json
+    if (newTechs.length > 0) {
+      await this.techsStorage.addNewTechs(newTechs);
+    }
+
+    // Update latest timestamp to keep record of recent usage
+    await this.techsStorage.updateTimestamps();
+
     if (uniqueTechs.length === 0) {
       this.logger.info("No technologies matched, skipping topic update");
       return;
     }
 
-    this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
-    await this.topicsManager.updateTopics(uniqueTechs);
+    // Merge with user techs for final topics list
+    const finalTechs = [...new Set([...userTechs, ...uniqueTechs])];
+    this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
+    await this.topicsManager.updateTopics(finalTechs);
   }
 
   private async getLanguagesFromGitHub(): Promise<string[]> {

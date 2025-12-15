@@ -31919,7 +31919,142 @@ class GitHubTopicsManager {
     }
 }
 
+;// CONCATENATED MODULE: ./src/tech-detector/techs-storage.ts
+
+
+class TechsStorage {
+    repoPath;
+    logger;
+    techsJsonPath;
+    constructor(repoPath, logger) {
+        this.repoPath = repoPath;
+        this.logger = logger;
+        this.techsJsonPath = external_node_path_default().join(repoPath, ".github", "techs.json");
+    }
+    async loadTechs() {
+        try {
+            const content = await (0,promises_namespaceObject.readFile)(this.techsJsonPath, "utf8");
+            const techs = JSON.parse(content);
+            // Ensure user field exists
+            if (!techs.user) {
+                techs.user = [];
+            }
+            this.logger.info(`Loaded existing techs.json with ${Object.keys(techs).length} entries`);
+            return techs;
+        }
+        catch {
+            this.logger.info("techs.json not found or invalid, creating new one");
+            return { user: [] };
+        }
+    }
+    async saveTechs(techs) {
+        try {
+            await (0,promises_namespaceObject.writeFile)(this.techsJsonPath, JSON.stringify(techs, undefined, 2), "utf8");
+            this.logger.info(`Saved techs.json with ${Object.keys(techs).length} entries`);
+        }
+        catch {
+            this.logger.error("Failed to save techs.json");
+            throw new Error("Failed to save techs.json");
+        }
+    }
+    async addNewTechs(newTechs) {
+        const techs = await this.loadTechs();
+        const timestamp = this.generateTimestamp();
+        // Only add techs that don't already exist
+        const existingTechs = this.getAllTechs(techs);
+        const uniqueNewTechs = newTechs.filter(tech => !existingTechs.has(tech));
+        if (uniqueNewTechs.length > 0) {
+            techs[timestamp] = uniqueNewTechs;
+            await this.saveTechs(techs);
+            this.logger.info(`Added ${uniqueNewTechs.length} new technologies to techs.json`);
+            this.logger.info(`New technologies: ${uniqueNewTechs.join(", ")}`);
+        }
+        else {
+            this.logger.info("No new technologies to add to techs.json");
+        }
+    }
+    async updateTimestamps() {
+        // Move all techs to current timestamp to keep track of recent usage
+        const techs = await this.loadTechs();
+        const userTechs = techs.user;
+        const allOtherTechs = this.getAllTechs(techs, true);
+        const timestamp = this.generateTimestamp();
+        const newTechs = {
+            user: userTechs,
+            [timestamp]: [...allOtherTechs],
+        };
+        await this.saveTechs(newTechs);
+        this.logger.info(`Updated timestamps for all technologies`);
+    }
+    hasTech(tech) {
+        return this.loadTechs().then(techs => this.getAllTechs(techs).has(tech));
+    }
+    getAllTechs(techs, excludeUser = false) {
+        const allTechs = new Set();
+        for (const [key, value] of Object.entries(techs)) {
+            if (excludeUser && key === "user") {
+                continue;
+            }
+            if (key !== "user" && Array.isArray(value)) {
+                for (const t of value)
+                    allTechs.add(t);
+            }
+        }
+        // Add user techs separately
+        if (!excludeUser && techs.user) {
+            for (const t of techs.user)
+                allTechs.add(t);
+        }
+        return allTechs;
+    }
+    getUserTechs(techs) {
+        return techs.user ?? [];
+    }
+    generateTimestamp() {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const year = now.getFullYear();
+        const hour = String(now.getHours()).padStart(2, "0");
+        return `${day}-${month}-${year}-${hour}`;
+    }
+    normalizeToBadge(tech) {
+        // Handle scoped packages like @types/jest or @babel/core
+        let normalized = tech;
+        if (normalized.startsWith("@")) {
+            const parts = normalized.split("/");
+            // If it's a type definition (@types/*), use just the package name
+            if (parts[0] === "@types" && parts.length > 1) {
+                normalized = parts[1];
+            }
+            else if (parts.length > 1) {
+                // For other scoped packages, keep the scope and package
+                normalized = parts.slice(1).join("-");
+            }
+        }
+        // Convert . to dot or - as per requirements
+        normalized = normalized
+            .toLowerCase()
+            // Replace dots with 'dot' or '-' (using dash for better GitHub topic compatibility)
+            .replaceAll(".", "-")
+            // Replace other separators with dash
+            .replaceAll(/[+_\s]/g, "-")
+            // Remove any character that's not alphanumeric or hyphen
+            .replaceAll(/[^a-z0-9-]/g, "")
+            // Collapse multiple hyphens into single
+            .replaceAll(/-+/g, "-")
+            // Remove leading/trailing hyphens
+            .replaceAll(/^-|-$/g, "");
+        // Handle some special cases to be GitHub topic compliant
+        if (normalized === "") {
+            normalized = "unknown";
+        }
+        return normalized;
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/tech-detector/tech-detector.ts
+
 class TechDetector {
     octokit;
     owner;
@@ -31927,19 +32062,31 @@ class TechDetector {
     dependencyParser;
     topicsManager;
     logger;
+    repoPath;
     apiBaseUrl = "https://kind-creation-production.up.railway.app/pre-tech";
     searchCache = new Map();
     delayMs = 500; // Delay between API requests
-    constructor(octokit, owner, repo, dependencyParser, topicsManager, logger) {
+    techsStorage;
+    constructor(octokit, owner, repo, dependencyParser, topicsManager, logger, repoPath) {
         this.octokit = octokit;
         this.owner = owner;
         this.repo = repo;
         this.dependencyParser = dependencyParser;
         this.topicsManager = topicsManager;
         this.logger = logger;
+        this.repoPath = repoPath;
+        this.techsStorage = new TechsStorage(repoPath, logger);
     }
     async detectAndTag(repoPath, includeFull) {
         this.logger.info("Starting technology detection...");
+        // Load existing techs from storage
+        const existingTechs = await this.techsStorage.loadTechs();
+        const userTechs = this.techsStorage.getUserTechs(existingTechs);
+        // First, update topics with user-defined techs (always included)
+        if (userTechs.length > 0) {
+            this.logger.info(`Including user-defined technologies: ${userTechs.join(", ")}`);
+            await this.topicsManager.updateTopics(userTechs);
+        }
         const dependencies = await this.dependencyParser.parseDependencies(repoPath);
         this.logger.info(`Found ${dependencies.length} dependencies`);
         if (dependencies.length > 0) {
@@ -31950,10 +32097,22 @@ class TechDetector {
         const allTechs = [...new Set([...dependencies, ...githubLanguages])];
         this.logger.info(`Total unique technologies to check: ${allTechs.length}`);
         const matchedTechs = [];
+        const newTechs = [];
         const failedTechs = [];
         for (const [i, tech] of allTechs.entries()) {
+            // Normalize to badge format for checking if it exists in techs.json
+            const normalizedBadge = this.techsStorage.normalizeToBadge(tech);
+            // Check if tech already exists in techs.json
+            if (await this.techsStorage.hasTech(normalizedBadge)) {
+                this.logger.info(`Technology ${tech} (${normalizedBadge}) already exists in techs.json, skipping API call`);
+                matchedTechs.push(normalizedBadge);
+                continue;
+            }
+            // Tech not found in techs.json, need to call API
+            this.logger.info(`New technology ${tech} (${normalizedBadge}), checking via API...`);
+            newTechs.push(normalizedBadge);
             // Add delay between API calls to avoid rate limiting
-            if (i > 0) {
+            if (i > 0 || matchedTechs.length > 0) {
                 await this.sleep(this.delayMs);
             }
             try {
@@ -31961,14 +32120,12 @@ class TechDetector {
                 const results = await this.searchTechnology(tech);
                 if (results.length > 0) {
                     this.logger.info(`Found ${results.length} match(es) for ${tech}: ${results.map(r => r.title).join(", ")}`);
-                    const normalized = this.normalizeTopic(tech);
-                    matchedTechs.push(normalized);
+                    matchedTechs.push(normalizedBadge);
                 }
                 else {
                     this.logger.info(`No API matches for ${tech}`);
                     if (includeFull) {
-                        const normalized = this.normalizeTopic(tech);
-                        matchedTechs.push(normalized);
+                        matchedTechs.push(normalizedBadge);
                     }
                 }
             }
@@ -31977,8 +32134,7 @@ class TechDetector {
                 this.logger.info(`Could not verify technology ${tech}: ${errorMessage}`);
                 failedTechs.push(tech);
                 if (includeFull) {
-                    const normalized = this.normalizeTopic(tech);
-                    matchedTechs.push(normalized);
+                    matchedTechs.push(normalizedBadge);
                 }
             }
         }
@@ -31987,12 +32143,20 @@ class TechDetector {
         if (failedTechs.length > 0) {
             this.logger.info(`Failed to verify: ${failedTechs.slice(0, 5).join(", ")}${failedTechs.length > 5 ? "..." : ""}`);
         }
+        // Save new techs to techs.json
+        if (newTechs.length > 0) {
+            await this.techsStorage.addNewTechs(newTechs);
+        }
+        // Update latest timestamp to keep record of recent usage
+        await this.techsStorage.updateTimestamps();
         if (uniqueTechs.length === 0) {
             this.logger.info("No technologies matched, skipping topic update");
             return;
         }
-        this.logger.info(`Creating topics: ${uniqueTechs.join(", ")}`);
-        await this.topicsManager.updateTopics(uniqueTechs);
+        // Merge with user techs for final topics list
+        const finalTechs = [...new Set([...userTechs, ...uniqueTechs])];
+        this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
+        await this.topicsManager.updateTopics(finalTechs);
     }
     async getLanguagesFromGitHub() {
         try {
@@ -32097,7 +32261,101 @@ class TechDetector {
     }
 }
 
+;// CONCATENATED MODULE: ./src/utils/change-detector.ts
+
+
+class ChangeDetector {
+    repoPath;
+    dependencyParser;
+    logger;
+    lastRunFile;
+    constructor(repoPath, dependencyParser, logger) {
+        this.repoPath = repoPath;
+        this.dependencyParser = dependencyParser;
+        this.logger = logger;
+        this.lastRunFile = external_node_path_default().join(repoPath, ".github", ".autotag-last-run");
+    }
+    async shouldRun(skipChangeDetection = false) {
+        if (skipChangeDetection) {
+            this.logger.info("Skipping change detection, forcing action run");
+            return true;
+        }
+        try {
+            const lastRunData = await this.loadLastRunData();
+            const currentDepsHash = await this.getCurrentDependenciesHash();
+            if (lastRunData.depsHash === currentDepsHash) {
+                const techsJsonMtime = await this.getFileMtime(external_node_path_default().join(this.repoPath, ".github", "techs.json"));
+                const lastRunTime = new Date(lastRunData.timestamp).getTime();
+                // If techs.json hasn't been modified since last run, skip
+                if (techsJsonMtime <= lastRunTime) {
+                    this.logger.info("No changes detected in dependencies or techs.json since last run");
+                    this.logger.info("Skipping action execution to reduce API calls");
+                    return false;
+                }
+            }
+            this.logger.info("Changes detected or first run, executing action");
+            return true;
+        }
+        catch {
+            // Error reading last run data means first time running
+            this.logger.info("First time running or error reading last run data, executing action");
+            return true;
+        }
+    }
+    async saveLastRunData() {
+        try {
+            const depsHash = await this.getCurrentDependenciesHash();
+            const lastRunData = {
+                depsHash,
+                timestamp: new Date().toISOString(),
+            };
+            const content = JSON.stringify(lastRunData, undefined, 2);
+            await (0,promises_namespaceObject.writeFile)(this.lastRunFile, content, "utf8");
+            this.logger.info(`Saved last run data with hash: ${depsHash}`);
+        }
+        catch (error) {
+            this.logger.error(`Failed to save last run data: ${error instanceof Error ? error.message : String(error)}`);
+            // Don't throw - action should continue even if we can't save last run data
+        }
+    }
+    async loadLastRunData() {
+        try {
+            const content = await (0,promises_namespaceObject.readFile)(this.lastRunFile, "utf8");
+            return JSON.parse(content);
+        }
+        catch {
+            throw new Error("Could not load last run data");
+        }
+    }
+    async getCurrentDependenciesHash() {
+        const dependencies = await this.dependencyParser.parseDependencies(this.repoPath);
+        const dependenciesString = dependencies.sort().join(",");
+        // Simple hash function for dependency list
+        return this.simpleHash(dependenciesString);
+    }
+    async getFileMtime(filePath) {
+        try {
+            const stats = await (0,promises_namespaceObject.stat)(filePath);
+            return stats.mtime.getTime();
+        }
+        catch {
+            // File doesn't exist or can't be read, return 0
+            return 0;
+        }
+    }
+    simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.codePointAt(i) ?? 0;
+            hash = (hash << 5) - hash + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString(16);
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/action.ts
+
 
 
 
@@ -32121,12 +32379,22 @@ class Action {
         this.logger.info(`Workspace: ${repoPath}`);
         const dependencyParser = new DependencyParser();
         const topicsManager = new GitHubTopicsManager(octokit, owner, repo, this.logger);
-        const techDetector = new TechDetector(octokit, owner, repo, dependencyParser, topicsManager, this.logger);
+        const changeDetector = new ChangeDetector(repoPath, dependencyParser, this.logger);
+        // Check if we need to run based on changes
+        const shouldRun = await changeDetector.shouldRun();
+        if (!shouldRun) {
+            this.logger.info("Action skipped due to no changes detected");
+            this.outputs.setSkipMessage("No changes detected in dependencies or techs.json since last run");
+            return;
+        }
+        const techDetector = new TechDetector(octokit, owner, repo, dependencyParser, topicsManager, this.logger, repoPath);
         try {
             const includeFull = inputs.full ?? false;
             await techDetector.detectAndTag(repoPath, includeFull);
             const dependencies = await dependencyParser.parseDependencies(repoPath);
             this.outputs.saveDetectedTechs(dependencies);
+            // Save last run data to track next changes
+            await changeDetector.saveLastRunData();
             this.logger.info("Action completed successfully");
         }
         catch (error) {
@@ -32164,6 +32432,10 @@ class CoreOutputs {
     }
     saveCreatedTopics(topics) {
         (0,core.setOutput)("created_topics", topics.join(","));
+    }
+    setSkipMessage(message) {
+        (0,core.setOutput)("skip_message", message);
+        (0,core.setOutput)("skipped", "true");
     }
 }
 
