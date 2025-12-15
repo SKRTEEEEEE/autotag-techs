@@ -32058,19 +32058,9 @@ class TechsStorage {
         }
         return normalized;
     }
-    async commitAndPushTechs() {
+    commitAndPushTechs() {
         try {
             const relativeFilePath = external_node_path_default().relative(this.repoPath, this.techsJsonPath);
-            // Check if file is modified
-            try {
-                (0,external_node_child_process_namespaceObject.execSync)("git diff --quiet HEAD", { cwd: this.repoPath });
-                // If no error, file is not modified
-                this.logger.info("No changes to commit");
-                return;
-            }
-            catch {
-                // File is modified, proceed with commit
-            }
             // Configure git if not already configured
             try {
                 (0,external_node_child_process_namespaceObject.execSync)("git config user.email", { cwd: this.repoPath });
@@ -32084,10 +32074,24 @@ class TechsStorage {
                 (0,external_node_child_process_namespaceObject.execSync)("git config user.name", { cwd: this.repoPath });
             }
             catch {
-                (0,external_node_child_process_namespaceObject.execSync)('git config user.name "Autotag Bot"', { cwd: this.repoPath });
+                (0,external_node_child_process_namespaceObject.execSync)('git config user.name "Autotag Bot"', {
+                    cwd: this.repoPath,
+                });
             }
-            // Add techs.json to staging
+            // Add techs.json to staging (even if not modified, to ensure it gets committed)
             (0,external_node_child_process_namespaceObject.execSync)(`git add "${relativeFilePath}"`, { cwd: this.repoPath });
+            // Check if there are actual changes
+            let hasChanges = false;
+            try {
+                (0,external_node_child_process_namespaceObject.execSync)("git diff --cached --quiet", { cwd: this.repoPath });
+            }
+            catch {
+                hasChanges = true;
+            }
+            if (!hasChanges) {
+                this.logger.info("No changes to techs.json");
+                return;
+            }
             // Commit
             (0,external_node_child_process_namespaceObject.execSync)("git commit -m 'chore: update techs.json with detected technologies'", {
                 cwd: this.repoPath,
@@ -32098,7 +32102,7 @@ class TechsStorage {
         }
         catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            this.logger.info(`Could not commit techs.json (might already be committed): ${errorMsg}`);
+            this.logger.info(`Warning: Could not commit techs.json: ${errorMsg}`);
         }
     }
 }
@@ -32217,7 +32221,7 @@ class TechDetector {
         this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
         await this.topicsManager.updateTopics(finalTechs);
         // Commit and push techs.json to persist changes
-        await this.techsStorage.commitAndPushTechs();
+        this.techsStorage.commitAndPushTechs();
     }
     async getLanguagesFromGitHub() {
         try {

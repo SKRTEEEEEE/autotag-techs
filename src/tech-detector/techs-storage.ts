@@ -175,16 +175,6 @@ export class TechsStorage {
     try {
       const relativeFilePath = path.relative(this.repoPath, this.techsJsonPath);
 
-      // Check if file is modified
-      try {
-        execSync("git diff --quiet HEAD", { cwd: this.repoPath });
-        // If no error, file is not modified
-        this.logger.info("No changes to commit");
-        return;
-      } catch {
-        // File is modified, proceed with commit
-      }
-
       // Configure git if not already configured
       try {
         execSync("git config user.email", { cwd: this.repoPath });
@@ -202,8 +192,21 @@ export class TechsStorage {
         });
       }
 
-      // Add techs.json to staging
+      // Add techs.json to staging (even if not modified, to ensure it gets committed)
       execSync(`git add "${relativeFilePath}"`, { cwd: this.repoPath });
+
+      // Check if there are actual changes
+      let hasChanges = false;
+      try {
+        execSync("git diff --cached --quiet", { cwd: this.repoPath });
+      } catch {
+        hasChanges = true;
+      }
+
+      if (!hasChanges) {
+        this.logger.info("No changes to techs.json");
+        return;
+      }
 
       // Commit
       execSync(
@@ -219,9 +222,7 @@ export class TechsStorage {
       this.logger.info("Successfully committed and pushed techs.json");
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      this.logger.info(
-        `Could not commit techs.json (might already be committed): ${errorMsg}`,
-      );
+      this.logger.info(`Warning: Could not commit techs.json: ${errorMsg}`);
     }
   }
 }
