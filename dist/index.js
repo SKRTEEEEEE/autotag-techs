@@ -32277,18 +32277,47 @@ class TechDetector {
             try {
                 this.logger.info(`Searching for technology: ${tech}`);
                 const results = await this.searchTechnology(tech);
-                if (results.length > 0) {
-                    this.logger.info(`Found ${results.length} match(es) for ${tech}: ${results.map(r => r.title).join(", ")}`);
+                // Check if any result matches exactly
+                // Compare against nameId (primary), nameBadge, or slug, all normalized the same way
+                const exactMatch = results.find(result => {
+                    // Try matching against nameId first (this is what gets stored in techs.json)
+                    if (result.nameId) {
+                        const resultNormalized = this.techsStorage.normalizeToBadge(result.nameId);
+                        if (resultNormalized === normalizedBadge) {
+                            return true;
+                        }
+                    }
+                    // Try nameBadge as fallback
+                    if (result.nameBadge) {
+                        const resultNormalized = this.techsStorage.normalizeToBadge(result.nameBadge);
+                        if (resultNormalized === normalizedBadge) {
+                            return true;
+                        }
+                    }
+                    // Finally try slug as last resort
+                    const resultNormalized = this.techsStorage.normalizeToBadge(result.slug);
+                    return resultNormalized === normalizedBadge;
+                });
+                if (exactMatch) {
+                    this.logger.info(`Found exact API match for ${tech}: ${exactMatch.title} (badge: ${exactMatch.nameBadge ?? exactMatch.slug})`);
                     matchedTechs.push(normalizedBadge);
                 }
                 else {
-                    this.logger.info(`No API matches for ${tech}`);
+                    if (results.length > 0) {
+                        const resultIdentifiers = results
+                            .map(r => r.nameBadge ?? r.slug)
+                            .join(", ");
+                        this.logger.info(`Found ${results.length} partial match(es) for ${tech} but no exact match: [${resultIdentifiers}]`);
+                    }
+                    else {
+                        this.logger.info(`No API matches for ${tech}`);
+                    }
                     if (includeFull) {
                         this.logger.info(`Adding ${tech} to topics because full: true`);
                         matchedTechs.push(normalizedBadge);
                     }
                     else {
-                        this.logger.info(`Excluding ${tech} because full: false and no API matches`);
+                        this.logger.info(`Excluding ${tech} because full: false and no exact API match`);
                         excludedTechs.push(normalizedBadge);
                     }
                 }
