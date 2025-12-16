@@ -31899,6 +31899,31 @@ class GitHubTopicsManager {
             // Don't throw - the action should succeed even if topics can't be updated
         }
     }
+    async removeTopics(topicsToRemove) {
+        if (topicsToRemove.length === 0) {
+            return;
+        }
+        const currentTopics = await this.getCurrentTopics();
+        this.logger.info(`Current topics: ${currentTopics.join(", ")}`);
+        this.logger.info(`Topics to remove: ${topicsToRemove.join(", ")}`);
+        const toRemoveSet = new Set(topicsToRemove.map(t => t.toLowerCase()));
+        const filteredTopics = currentTopics.filter(topic => !toRemoveSet.has(topic.toLowerCase()));
+        if (filteredTopics.length === currentTopics.length) {
+            this.logger.info("No topics were removed (none matched the removal list)");
+            return;
+        }
+        this.logger.info(`Filtered topics: ${filteredTopics.join(", ")}`);
+        try {
+            await this.setTopics(filteredTopics);
+            const removed = currentTopics.filter(topic => toRemoveSet.has(topic.toLowerCase()));
+            this.logger.info(`Successfully removed topics: ${removed.join(", ")}`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.info(`Warning: Could not remove repository topics: ${errorMessage}`);
+            // Don't throw - the action should succeed even if topics can't be updated
+        }
+    }
     async getCurrentTopics() {
         const response = await this.octokit.rest.repos.getAllTopics({
             owner: this.owner,
@@ -31980,6 +32005,42 @@ class TechsStorage {
         }
         else {
             this.logger.info("No new technologies to add to techs.json");
+        }
+    }
+    async removeTechs(techsToRemove) {
+        if (techsToRemove.length === 0) {
+            return;
+        }
+        const techs = await this.loadTechs();
+        const toRemoveSet = new Set(techsToRemove.map(t => t.toLowerCase()));
+        let removedCount = 0;
+        const newTechs = { user: techs.user };
+        // Remove from all timestamp entries
+        for (const [key, value] of Object.entries(techs)) {
+            if (key === "user") {
+                continue; // Don't remove from user-defined techs
+            }
+            if (Array.isArray(value)) {
+                const beforeCount = value.length;
+                const filtered = value.filter(tech => !toRemoveSet.has(tech.toLowerCase()));
+                removedCount += beforeCount - filtered.length;
+                // Keep only non-empty timestamp entries
+                if (filtered.length > 0) {
+                    newTechs[key] = filtered;
+                    this.logger.info(`Filtered timestamp entry ${key}: ${filtered.length} techs remaining`);
+                }
+                else {
+                    this.logger.info(`Removed empty timestamp entry: ${key}`);
+                }
+            }
+        }
+        if (removedCount > 0) {
+            await this.saveTechs(newTechs);
+            this.logger.info(`Removed ${removedCount} technologies from techs.json`);
+            this.logger.info(`Removed technologies: ${techsToRemove.join(", ")}`);
+        }
+        else {
+            this.logger.info("No technologies were removed from techs.json");
         }
     }
     async updateTimestamps() {
@@ -32086,7 +32147,10 @@ class TechsStorage {
                     sha = response.data.sha;
                 }
                 if ("content" in response.data) {
-                    existingContent = Buffer.from(response.data.content, "base64").toString("utf8");
+                    const content = response.data.content;
+                    if (typeof content === "string") {
+                        existingContent = Buffer.from(content, "base64").toString("utf8");
+                    }
                 }
             }
             catch (error) {
@@ -32173,6 +32237,7 @@ class TechDetector {
         const matchedTechs = [];
         const newTechs = [];
         const failedTechs = [];
+        const excludedTechs = [];
         for (const [i, tech] of allTechs.entries()) {
             // Normalize to badge format for checking if it exists in techs.json
             const normalizedBadge = this.techsStorage.normalizeToBadge(tech);
@@ -32199,7 +32264,12 @@ class TechDetector {
                 else {
                     this.logger.info(`No API matches for ${tech}`);
                     if (includeFull) {
+                        this.logger.info(`Adding ${tech} to topics because full: true`);
                         matchedTechs.push(normalizedBadge);
+                    }
+                    else {
+                        this.logger.info(`Excluding ${tech} because full: false and no API matches`);
+                        excludedTechs.push(normalizedBadge);
                     }
                 }
             }
@@ -32208,7 +32278,12 @@ class TechDetector {
                 this.logger.info(`Could not verify technology ${tech}: ${errorMessage}`);
                 failedTechs.push(tech);
                 if (includeFull) {
+                    this.logger.info(`Adding ${tech} to topics because full: true despite API error`);
                     matchedTechs.push(normalizedBadge);
+                }
+                else {
+                    this.logger.info(`Excluding ${tech} because full: false and API verification failed`);
+                    excludedTechs.push(normalizedBadge);
                 }
             }
         }
@@ -32221,6 +32296,11 @@ class TechDetector {
         if (uniqueTechs.length > 0) {
             await this.techsStorage.addNewTechs(uniqueTechs);
         }
+        // Remove excluded techs from techs.json when full: false
+        if (!includeFull && excludedTechs.length > 0) {
+            this.logger.info(`Removing ${excludedTechs.length} unverified technologies from techs.json`);
+            await this.techsStorage.removeTechs(excludedTechs);
+        }
         // Update latest timestamp to keep record of recent usage
         await this.techsStorage.updateTimestamps();
         if (uniqueTechs.length === 0) {
@@ -32231,6 +32311,11 @@ class TechDetector {
         const finalTechs = [...new Set([...userTechs, ...uniqueTechs])];
         this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
         await this.topicsManager.updateTopics(finalTechs);
+        // Remove excluded techs from repository topics when full: false
+        if (!includeFull && excludedTechs.length > 0) {
+            this.logger.info(`Removing ${excludedTechs.length} unverified technologies from topics`);
+            await this.topicsManager.removeTopics(excludedTechs);
+        }
         // Commit and push techs.json to persist changes
         await this.techsStorage.commitAndPushTechs();
     }

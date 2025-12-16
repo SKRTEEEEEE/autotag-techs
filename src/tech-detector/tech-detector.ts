@@ -86,6 +86,7 @@ export class TechDetector {
     const matchedTechs: string[] = [];
     const newTechs: string[] = [];
     const failedTechs: string[] = [];
+    const excludedTechs: string[] = [];
 
     for (const [i, tech] of allTechs.entries()) {
       // Normalize to badge format for checking if it exists in techs.json
@@ -122,7 +123,13 @@ export class TechDetector {
         } else {
           this.logger.info(`No API matches for ${tech}`);
           if (includeFull) {
+            this.logger.info(`Adding ${tech} to topics because full: true`);
             matchedTechs.push(normalizedBadge);
+          } else {
+            this.logger.info(
+              `Excluding ${tech} because full: false and no API matches`,
+            );
+            excludedTechs.push(normalizedBadge);
           }
         }
       } catch (error) {
@@ -133,7 +140,15 @@ export class TechDetector {
         );
         failedTechs.push(tech);
         if (includeFull) {
+          this.logger.info(
+            `Adding ${tech} to topics because full: true despite API error`,
+          );
           matchedTechs.push(normalizedBadge);
+        } else {
+          this.logger.info(
+            `Excluding ${tech} because full: false and API verification failed`,
+          );
+          excludedTechs.push(normalizedBadge);
         }
       }
     }
@@ -151,6 +166,14 @@ export class TechDetector {
       await this.techsStorage.addNewTechs(uniqueTechs);
     }
 
+    // Remove excluded techs from techs.json when full: false
+    if (!includeFull && excludedTechs.length > 0) {
+      this.logger.info(
+        `Removing ${excludedTechs.length} unverified technologies from techs.json`,
+      );
+      await this.techsStorage.removeTechs(excludedTechs);
+    }
+
     // Update latest timestamp to keep record of recent usage
     await this.techsStorage.updateTimestamps();
 
@@ -163,6 +186,14 @@ export class TechDetector {
     const finalTechs = [...new Set([...userTechs, ...uniqueTechs])];
     this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
     await this.topicsManager.updateTopics(finalTechs);
+
+    // Remove excluded techs from repository topics when full: false
+    if (!includeFull && excludedTechs.length > 0) {
+      this.logger.info(
+        `Removing ${excludedTechs.length} unverified technologies from topics`,
+      );
+      await this.topicsManager.removeTopics(excludedTechs);
+    }
 
     // Commit and push techs.json to persist changes
     await this.techsStorage.commitAndPushTechs();

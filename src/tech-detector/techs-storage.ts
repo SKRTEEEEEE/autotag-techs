@@ -82,6 +82,51 @@ export class TechsStorage {
     }
   }
 
+  async removeTechs(techsToRemove: string[]): Promise<void> {
+    if (techsToRemove.length === 0) {
+      return;
+    }
+
+    const techs = await this.loadTechs();
+    const toRemoveSet = new Set(techsToRemove.map(t => t.toLowerCase()));
+
+    let removedCount = 0;
+    const newTechs: TechsJson = { user: techs.user };
+
+    // Remove from all timestamp entries
+    for (const [key, value] of Object.entries(techs)) {
+      if (key === "user") {
+        continue; // Don't remove from user-defined techs
+      }
+
+      if (Array.isArray(value)) {
+        const beforeCount = value.length;
+        const filtered = value.filter(
+          tech => !toRemoveSet.has(tech.toLowerCase()),
+        );
+        removedCount += beforeCount - filtered.length;
+
+        // Keep only non-empty timestamp entries
+        if (filtered.length > 0) {
+          newTechs[key] = filtered;
+          this.logger.info(
+            `Filtered timestamp entry ${key}: ${filtered.length} techs remaining`,
+          );
+        } else {
+          this.logger.info(`Removed empty timestamp entry: ${key}`);
+        }
+      }
+    }
+
+    if (removedCount > 0) {
+      await this.saveTechs(newTechs);
+      this.logger.info(`Removed ${removedCount} technologies from techs.json`);
+      this.logger.info(`Removed technologies: ${techsToRemove.join(", ")}`);
+    } else {
+      this.logger.info("No technologies were removed from techs.json");
+    }
+  }
+
   async updateTimestamps(): Promise<void> {
     // Move all techs to current timestamp to keep track of recent usage
     const techs = await this.loadTechs();

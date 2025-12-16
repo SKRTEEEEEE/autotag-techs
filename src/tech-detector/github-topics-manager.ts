@@ -38,6 +38,45 @@ export class GitHubTopicsManager {
     }
   }
 
+  async removeTopics(topicsToRemove: string[]): Promise<void> {
+    if (topicsToRemove.length === 0) {
+      return;
+    }
+
+    const currentTopics = await this.getCurrentTopics();
+    this.logger.info(`Current topics: ${currentTopics.join(", ")}`);
+    this.logger.info(`Topics to remove: ${topicsToRemove.join(", ")}`);
+
+    const toRemoveSet = new Set(topicsToRemove.map(t => t.toLowerCase()));
+    const filteredTopics = currentTopics.filter(
+      topic => !toRemoveSet.has(topic.toLowerCase()),
+    );
+
+    if (filteredTopics.length === currentTopics.length) {
+      this.logger.info(
+        "No topics were removed (none matched the removal list)",
+      );
+      return;
+    }
+
+    this.logger.info(`Filtered topics: ${filteredTopics.join(", ")}`);
+
+    try {
+      await this.setTopics(filteredTopics);
+      const removed = currentTopics.filter(topic =>
+        toRemoveSet.has(topic.toLowerCase()),
+      );
+      this.logger.info(`Successfully removed topics: ${removed.join(", ")}`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.info(
+        `Warning: Could not remove repository topics: ${errorMessage}`,
+      );
+      // Don't throw - the action should succeed even if topics can't be updated
+    }
+  }
+
   private async getCurrentTopics(): Promise<string[]> {
     const response = await this.octokit.rest.repos.getAllTopics({
       owner: this.owner,
