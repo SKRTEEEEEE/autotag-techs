@@ -24,6 +24,9 @@ export class TechDetector {
 
   private readonly delayMs = 500; // Delay between API requests
 
+  // Technologies that should always be included when detected, even without exact API match
+  private readonly alwaysIncludedTechs = new Set(["go"]);
+
   private readonly techsStorage: TechsStorage;
 
   constructor(
@@ -161,6 +164,9 @@ export class TechDetector {
             const resultNormalized = this.techsStorage.normalizeToBadge(
               result.nameId,
             );
+            this.logger.info(
+              `[Match Check] nameId="${result.nameId}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`,
+            );
             if (resultNormalized === normalizedBadge) {
               return true;
             }
@@ -170,6 +176,9 @@ export class TechDetector {
             const resultNormalized = this.techsStorage.normalizeToBadge(
               result.nameBadge,
             );
+            this.logger.info(
+              `[Match Check] nameBadge="${result.nameBadge}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`,
+            );
             if (resultNormalized === normalizedBadge) {
               return true;
             }
@@ -177,6 +186,9 @@ export class TechDetector {
           // Finally try slug as last resort
           const resultNormalized = this.techsStorage.normalizeToBadge(
             result.slug,
+          );
+          this.logger.info(
+            `[Match Check] slug="${result.slug}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`,
           );
           return resultNormalized === normalizedBadge;
         });
@@ -201,6 +213,11 @@ export class TechDetector {
           if (includeFull) {
             this.logger.info(`Adding ${tech} to topics because full: true`);
             matchedTechs.push(normalizedBadge);
+          } else if (this.alwaysIncludedTechs.has(normalizedBadge)) {
+            this.logger.info(
+              `Adding ${tech} to topics because it's in the always-included list`,
+            );
+            matchedTechs.push(normalizedBadge);
           } else {
             this.logger.info(
               `Excluding ${tech} because full: false and no exact API match`,
@@ -218,6 +235,11 @@ export class TechDetector {
         if (includeFull) {
           this.logger.info(
             `Adding ${tech} to topics because full: true despite API error`,
+          );
+          matchedTechs.push(normalizedBadge);
+        } else if (this.alwaysIncludedTechs.has(normalizedBadge)) {
+          this.logger.info(
+            `Adding ${tech} to topics because it's in the always-included list (API error)`,
           );
           matchedTechs.push(normalizedBadge);
         } else {

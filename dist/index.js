@@ -32197,6 +32197,8 @@ class TechDetector {
     apiBaseUrl = "https://kind-creation-production.up.railway.app/pre-tech";
     searchCache = new Map();
     delayMs = 500; // Delay between API requests
+    // Technologies that should always be included when detected, even without exact API match
+    alwaysIncludedTechs = new Set(["go"]);
     techsStorage;
     constructor(octokit, owner, repo, dependencyParser, topicsManager, logger, repoPath) {
         this.octokit = octokit;
@@ -32283,6 +32285,7 @@ class TechDetector {
                     // Try matching against nameId first (this is what gets stored in techs.json)
                     if (result.nameId) {
                         const resultNormalized = this.techsStorage.normalizeToBadge(result.nameId);
+                        this.logger.info(`[Match Check] nameId="${result.nameId}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`);
                         if (resultNormalized === normalizedBadge) {
                             return true;
                         }
@@ -32290,12 +32293,14 @@ class TechDetector {
                     // Try nameBadge as fallback
                     if (result.nameBadge) {
                         const resultNormalized = this.techsStorage.normalizeToBadge(result.nameBadge);
+                        this.logger.info(`[Match Check] nameBadge="${result.nameBadge}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`);
                         if (resultNormalized === normalizedBadge) {
                             return true;
                         }
                     }
                     // Finally try slug as last resort
                     const resultNormalized = this.techsStorage.normalizeToBadge(result.slug);
+                    this.logger.info(`[Match Check] slug="${result.slug}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`);
                     return resultNormalized === normalizedBadge;
                 });
                 if (exactMatch) {
@@ -32316,6 +32321,10 @@ class TechDetector {
                         this.logger.info(`Adding ${tech} to topics because full: true`);
                         matchedTechs.push(normalizedBadge);
                     }
+                    else if (this.alwaysIncludedTechs.has(normalizedBadge)) {
+                        this.logger.info(`Adding ${tech} to topics because it's in the always-included list`);
+                        matchedTechs.push(normalizedBadge);
+                    }
                     else {
                         this.logger.info(`Excluding ${tech} because full: false and no exact API match`);
                         excludedTechs.push(normalizedBadge);
@@ -32328,6 +32337,10 @@ class TechDetector {
                 failedTechs.push(tech);
                 if (includeFull) {
                     this.logger.info(`Adding ${tech} to topics because full: true despite API error`);
+                    matchedTechs.push(normalizedBadge);
+                }
+                else if (this.alwaysIncludedTechs.has(normalizedBadge)) {
+                    this.logger.info(`Adding ${tech} to topics because it's in the always-included list (API error)`);
                     matchedTechs.push(normalizedBadge);
                 }
                 else {
