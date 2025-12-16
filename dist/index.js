@@ -32234,9 +32234,25 @@ class TechDetector {
             ...new Set([...dependencies, ...githubLanguages, ...fileBasedTechs]),
         ];
         this.logger.info(`Total unique technologies to check: ${allTechs.length}`);
+        // Normalize all detected techs for comparison
+        const normalizedDetectedTechs = new Set(allTechs.map(tech => this.techsStorage.normalizeToBadge(tech)));
         const matchedTechs = [];
         const failedTechs = [];
         const excludedTechs = [];
+        const techsToRemoveFromStorage = [];
+        // When full: false, check for techs in storage that are no longer detected
+        if (!includeFull) {
+            const existingTechs = await this.techsStorage.loadTechs();
+            const allStoredTechs = this.techsStorage.getAllTechs(existingTechs, false);
+            const userTechsSet = new Set(userTechs);
+            for (const storedTech of allStoredTechs) {
+                if (!normalizedDetectedTechs.has(storedTech) &&
+                    !userTechsSet.has(storedTech)) {
+                    this.logger.info(`Technology ${storedTech} no longer detected, marking for removal (full: false)`);
+                    techsToRemoveFromStorage.push(storedTech);
+                }
+            }
+        }
         for (const [i, tech] of allTechs.entries()) {
             // Normalize to badge format for checking if it exists in techs.json
             const normalizedBadge = this.techsStorage.normalizeToBadge(tech);
@@ -32301,9 +32317,14 @@ class TechDetector {
             await this.techsStorage.addNewTechs(uniqueTechs);
         }
         // Remove excluded techs from techs.json when full: false
-        if (!includeFull && excludedTechs.length > 0) {
-            this.logger.info(`Removing ${excludedTechs.length} unverified technologies from techs.json`);
-            await this.techsStorage.removeTechs(excludedTechs);
+        if (!includeFull) {
+            const allToRemove = [
+                ...new Set([...excludedTechs, ...techsToRemoveFromStorage]),
+            ];
+            if (allToRemove.length > 0) {
+                this.logger.info(`Removing ${allToRemove.length} unverified/undetected technologies from techs.json`);
+                await this.techsStorage.removeTechs(allToRemove);
+            }
         }
         // Update latest timestamp to keep record of recent usage
         await this.techsStorage.updateTimestamps();
@@ -32316,9 +32337,14 @@ class TechDetector {
         this.logger.info(`Creating topics: ${finalTechs.join(", ")}`);
         await this.topicsManager.updateTopics(finalTechs);
         // Remove excluded techs from repository topics when full: false
-        if (!includeFull && excludedTechs.length > 0) {
-            this.logger.info(`Removing ${excludedTechs.length} unverified technologies from topics`);
-            await this.topicsManager.removeTopics(excludedTechs);
+        if (!includeFull) {
+            const allToRemoveFromTopics = [
+                ...new Set([...excludedTechs, ...techsToRemoveFromStorage]),
+            ];
+            if (allToRemoveFromTopics.length > 0) {
+                this.logger.info(`Removing ${allToRemoveFromTopics.length} unverified/undetected technologies from topics`);
+                await this.topicsManager.removeTopics(allToRemoveFromTopics);
+            }
         }
         // Commit and push techs.json to persist changes
         await this.techsStorage.commitAndPushTechs();
