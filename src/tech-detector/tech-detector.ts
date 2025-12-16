@@ -84,7 +84,6 @@ export class TechDetector {
     this.logger.info(`Total unique technologies to check: ${allTechs.length}`);
 
     const matchedTechs: string[] = [];
-    const newTechs: string[] = [];
     const failedTechs: string[] = [];
     const excludedTechs: string[] = [];
 
@@ -92,20 +91,28 @@ export class TechDetector {
       // Normalize to badge format for checking if it exists in techs.json
       const normalizedBadge = this.techsStorage.normalizeToBadge(tech);
 
-      // Check if tech already exists in techs.json
-      if (await this.techsStorage.hasTech(normalizedBadge)) {
+      // When full: true, skip API check for existing techs
+      // When full: false, always verify against API to catch invalid techs stored before
+      const techExists = await this.techsStorage.hasTech(normalizedBadge);
+      if (includeFull && techExists) {
         this.logger.info(
-          `Technology ${tech} (${normalizedBadge}) already exists in techs.json, skipping API call`,
+          `Technology ${tech} (${normalizedBadge}) already exists in techs.json, skipping API call (full: true)`,
         );
         matchedTechs.push(normalizedBadge);
         continue;
       }
 
-      // Tech not found in techs.json, need to call API
+      // When full: false, even if tech exists, verify it against API
+      if (!includeFull && techExists) {
+        this.logger.info(
+          `Technology ${tech} (${normalizedBadge}) exists in techs.json, re-verifying against API (full: false)`,
+        );
+      }
+
+      // Tech not found in techs.json (or need to verify for full: false)
       this.logger.info(
-        `New technology ${tech} (${normalizedBadge}), checking via API...`,
+        `Technology ${tech} (${normalizedBadge}), checking via API...`,
       );
-      newTechs.push(normalizedBadge);
 
       // Add delay between API calls to avoid rate limiting
       if (i > 0 || matchedTechs.length > 0) {
