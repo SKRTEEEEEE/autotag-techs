@@ -25,7 +25,7 @@ export class TechDetector {
   private readonly delayMs = 500; // Delay between API requests
 
   // Technologies that should always be included when detected, even without exact API match
-  private readonly alwaysIncludedTechs = new Set(["go"]);
+  private readonly alwaysIncludedTechs = new Set(["go", "shell"]);
 
   private readonly techsStorage: TechsStorage;
 

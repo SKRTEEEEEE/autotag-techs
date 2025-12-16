@@ -32198,7 +32198,7 @@ class TechDetector {
     searchCache = new Map();
     delayMs = 500; // Delay between API requests
     // Technologies that should always be included when detected, even without exact API match
-    alwaysIncludedTechs = new Set(["go"]);
+    alwaysIncludedTechs = new Set(["go", "shell"]);
     techsStorage;
     constructor(octokit, owner, repo, dependencyParser, topicsManager, logger, repoPath) {
         this.octokit = octokit;
