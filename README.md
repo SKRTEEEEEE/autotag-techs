@@ -109,14 +109,14 @@ jobs:
 
 This file is automatically created and maintained by the action. It serves as a cache of detected technologies and persists user-defined technologies across runs.
 
-**Format:** Each timestamp key contains an array of detected technologies (in `nameBadge` format), and the `user` array contains technologies that will always be included in GitHub Topics.
+**Format:** Each timestamp key contains an array of detected technologies (in normalized nameId format), and the `user` array contains technologies that will always be included in GitHub Topics.
 
 Example:
 
 ```json
 {
   "user": ["nest-js", "nextjs", "tailwind-css"],
-  "15-12-2025-14": ["shadcnui", "go"],
+  "15-12-2025-14": ["shadcn-ui", "go"],
   "18-12-2025-17": ["radix-ui"]
 }
 ```
@@ -127,6 +127,25 @@ Example:
 - **Performance optimized:** Avoids redundant API calls for already-detected techs
 - **Persistent tech tracking:** User-defined technologies persist across runs and won't be deleted
 - **User-defined techs support:** Use the `user` field to specify technologies that should always be included in Topics
+
+### API Field Mapping
+
+The action validates technologies against the API and uses the following field priority:
+
+- **`nameId`**: The primary identifier (typical name, may contain `.`). This is what gets normalized and stored in `techs.json`.
+  - Example: `Next.js` → normalized to `nextjs`, `.NET` → normalized to `dotnet`
+- **`nameBadge`**: GitHub Topics-compatible format (already normalized, no `.`). Used as fallback for validation.
+- **`slug`**: Additional identifier for matching. Used as last resort if nameId/nameBadge unavailable.
+
+### Normalization Rules
+
+When `full: false` (default), only technologies with exact API matches are included. Normalization converts:
+
+- `.` (dot) → `-` (dash), with special cases like `.net` → `dotnet`
+- Spaces and underscores → `-` (dash)
+- Multiple dashes → single dash
+- Uppercase → lowercase
+- Special characters removed
 
 ## 😎 Contributing
 
