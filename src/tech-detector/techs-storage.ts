@@ -275,7 +275,7 @@ export class TechsStorage {
         owner: this.owner,
         repo: this.repo,
         path: ".github/techs.json",
-        message: "chore: update techs.json with detected technologies",
+        message: "chore: update techs.json with detected technologies [skip ci]",
         content: Buffer.from(content).toString("base64"),
         sha,
         committer: {

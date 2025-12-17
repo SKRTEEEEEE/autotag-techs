@@ -45,7 +45,19 @@ await octokit.repos.createOrUpdateFileContents({
 
 ### ✅ SOLUCIÓN IMPLEMENTADA
 
-**1. Check del autor al inicio de la Action:**
+**CAPA 1: [skip ci] en el mensaje de commit (PRINCIPAL):**
+
+```typescript
+// techs-storage.ts
+await this.octokit.repos.createOrUpdateFileContents({
+  message: "chore: update techs.json with detected technologies [skip ci]",
+  // ...
+});
+```
+
+**¿Por qué es la PRINCIPAL?** Porque GitHub Actions **NI SIQUIERA INICIA** el workflow cuando ve `[skip ci]`, `[ci skip]`, `[no ci]`, `[skip actions]`, o `***NO_CI***` en el mensaje de commit.
+
+**CAPA 2: Check del autor al inicio de la Action (FALLBACK):**
 
 ```typescript
 // src/action.ts
@@ -70,7 +82,7 @@ async run(inputs: Inputs) {
 }
 ```
 
-**2. Verificar contenido antes de commit:**
+**CAPA 3: Verificar contenido antes de commit:**
 
 ```typescript
 // Solo hacer commit si hay cambios REALES
@@ -81,7 +93,7 @@ if (hasChanges) {
 }
 ```
 
-**3. Verificar si el contenido cambió antes de push:**
+**CAPA 4: Verificar si el contenido cambió antes de push:**
 
 ```typescript
 // techs-storage.ts
@@ -129,16 +141,17 @@ github.actor                           # En workflow YAML
 
 ### 🛡️ Mejores Prácticas
 
-1. **SIEMPRE** verifica si el último commit es de un bot antes de ejecutar lógica que hace commits
-2. **SIEMPRE** compara contenido antes de hacer commit (evitar commits vacíos)
-3. **NUNCA** asumas que firmar como bot previene la re-ejecución
-4. **CONSIDERA** usar `[skip ci]` en el mensaje de commit como fallback adicional:
-
-```typescript
-message: "chore: update techs.json [skip ci]";
-```
-
+1. **SIEMPRE** usa `[skip ci]` en el mensaje de commit cuando el bot hace commits automáticos
+2. **SIEMPRE** agrega check de GITHUB_ACTOR como fallback de seguridad
+3. **SIEMPRE** compara contenido antes de hacer commit (evitar commits vacíos)
+4. **NUNCA** asumas que firmar como bot previene la re-ejecución (NO LO HACE)
 5. **DOCUMENTA** este comportamiento para futuros desarrolladores/IAs
+
+**Palabras clave que GitHub reconoce para skip CI:**
+- `[skip ci]` o `[ci skip]`
+- `[no ci]`
+- `[skip actions]` o `[actions skip]`
+- `***NO_CI***`
 
 ### 🔗 Referencias
 

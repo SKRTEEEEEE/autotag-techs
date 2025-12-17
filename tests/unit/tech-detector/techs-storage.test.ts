@@ -376,7 +376,8 @@ describe("TechsStorage", () => {
           owner: "test-owner",
           repo: "test-repo",
           path: ".github/techs.json",
-          message: "chore: update techs.json with detected technologies",
+          message:
+            "chore: update techs.json with detected technologies [skip ci]",
           committer: {
             name: "github-actions[bot]",
             email: "41898282+github-actions[bot]@users.noreply.github.com",
