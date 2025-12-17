@@ -31944,6 +31944,94 @@ class GitHubTopicsManager {
     }
 }
 
+;// CONCATENATED MODULE: ./src/tech-detector/tech-name-mappings.ts
+/**
+ * Mapping dictionary for package names to their official Simple Icons nameId.
+ * Used when the package name doesn't directly match the API nameId.
+ *
+ * Format: { "package-name": "Official nameId from API" }
+ */
+const TECH_NAME_MAPPINGS = {
+    // UI Libraries & Icon Sets
+    "lucide-react": "Lucide",
+    "lucide": "Lucide",
+    "@radix-ui/react-alert-dialog": "Radix UI",
+    "@radix-ui/react-avatar": "Radix UI",
+    "@radix-ui/react-dialog": "Radix UI",
+    "@radix-ui/react-dropdown-menu": "Radix UI",
+    "@radix-ui/react-icons": "Radix UI",
+    "@radix-ui/react-label": "Radix UI",
+    "@radix-ui/react-navigation-menu": "Radix UI",
+    "@radix-ui/react-popover": "Radix UI",
+    "@radix-ui/react-select": "Radix UI",
+    "@radix-ui/react-separator": "Radix UI",
+    "@radix-ui/react-slot": "Radix UI",
+    "@radix-ui/react-tabs": "Radix UI",
+    // React Ecosystem
+    "react-dom": "React",
+    "react-router": "React Router",
+    "react-router-dom": "React Router",
+    "react-hook-form": "React Hook Form",
+    "@testing-library/react": "Testing Library",
+    "@testing-library/user-event": "Testing Library",
+    "@testing-library/jest-dom": "Testing Library",
+    // Next.js Ecosystem
+    "next-intl": "Next.js",
+    "next-themes": "Next.js",
+    "next-auth": "NextAuth.js",
+    "eslint-config-next": "Next.js",
+    // CSS & Styling
+    "tailwind-merge": "Tailwind CSS",
+    "tailwind-scrollbar": "Tailwind CSS",
+    "tailwind-variants": "Tailwind CSS",
+    "tw-animate-css": "Tailwind CSS",
+    "@tailwindcss/postcss": "Tailwind CSS",
+    "class-variance-authority": "Tailwind CSS", // CVA is commonly used with Tailwind
+    // Build Tools & Bundlers
+    "@vitejs/plugin-react": "Vite",
+    "vite-tsconfig-paths": "Vite",
+    // Testing
+    "@vitest/coverage-v8": "Vitest",
+    "@vitest/ui": "Vitest",
+    "@playwright/test": "Playwright",
+    jsdom: "jsdom",
+    // TypeScript
+    "@typescript-eslint/eslint-plugin": "TypeScript",
+    "@typescript-eslint/parser": "TypeScript",
+    "@types/node": "Node.js",
+    "@types/react": "React",
+    "@types/react-dom": "React",
+    // Linting & Formatting
+    "@eslint/eslintrc": "ESLint",
+    "eslint-plugin-react": "React",
+    "eslint-plugin-react-hooks": "React",
+    "eslint-plugin-jsx-a11y": "React",
+    // Performance & Monitoring
+    "@lhci/cli": "Lighthouse",
+    lighthouse: "Lighthouse",
+    // Package Managers & Tools
+    husky: "Husky",
+    "cross-env": "cross-env",
+    nyc: "nyc",
+    "wait-on": "wait-on",
+    // Form Handling
+    "@hookform/resolvers": "React Hook Form",
+    // File Upload
+    "@uploadthing/react": "UploadThing",
+    uploadthing: "UploadThing",
+    // Misc
+    clsx: "clsx",
+    sonner: "Sonner",
+    zod: "Zod",
+    thirdweb: "thirdweb",
+};
+/**
+ * Get the mapped tech name if it exists, otherwise return original
+ */
+function getMappedTechName(packageName) {
+    return TECH_NAME_MAPPINGS[packageName.toLowerCase()] ?? packageName;
+}
+
 ;// CONCATENATED MODULE: ./src/tech-detector/techs-storage.ts
 
 
@@ -32194,6 +32282,7 @@ class TechsStorage {
 
 
 
+
 class TechDetector {
     octokit;
     owner;
@@ -32228,7 +32317,9 @@ class TechDetector {
             this.logger.info(`Including user-defined technologies: ${userTechs.join(", ")}`);
             await this.topicsManager.updateTopics(userTechs);
         }
-        const dependencies = await this.dependencyParser.parseDependencies(repoPath);
+        const rawDependencies = await this.dependencyParser.parseDependencies(repoPath);
+        // Apply name mappings to dependencies
+        const dependencies = rawDependencies.map(dep => getMappedTechName(dep));
         this.logger.info(`Found ${dependencies.length} dependencies`);
         if (dependencies.length > 0) {
             this.logger.info(`Dependencies: ${dependencies.slice(0, 10).join(", ")}${dependencies.length > 10 ? "..." : ""}`);
@@ -32306,10 +32397,13 @@ class TechDetector {
                             return true;
                         }
                     }
-                    // Finally try slug as last resort
-                    const resultNormalized = this.techsStorage.normalizeToBadge(result.slug);
-                    this.logger.info(`[Match Check] slug="${result.slug}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`);
-                    return resultNormalized === normalizedBadge;
+                    // Finally try slug as last resort (if it exists)
+                    if (result.slug) {
+                        const resultNormalized = this.techsStorage.normalizeToBadge(result.slug);
+                        this.logger.info(`[Match Check] slug="${result.slug}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`);
+                        return resultNormalized === normalizedBadge;
+                    }
+                    return false;
                 });
                 if (exactMatch) {
                     this.logger.info(`Found exact API match for ${tech}: ${exactMatch.title} (badge: ${exactMatch.nameBadge ?? exactMatch.slug})`);
@@ -32362,9 +32456,12 @@ class TechDetector {
         if (failedTechs.length > 0) {
             this.logger.info(`Failed to verify: ${failedTechs.slice(0, 5).join(", ")}${failedTechs.length > 5 ? "..." : ""}`);
         }
+        // Track if there were any real changes
+        let hasChanges = false;
         // Save only matched techs to techs.json (not all new techs)
         if (uniqueTechs.length > 0) {
             await this.techsStorage.addNewTechs(uniqueTechs);
+            hasChanges = true;
         }
         // Remove excluded techs from techs.json when full: false
         if (!includeFull) {
@@ -32374,10 +32471,16 @@ class TechDetector {
             if (allToRemove.length > 0) {
                 this.logger.info(`Removing ${allToRemove.length} unverified/undetected technologies from techs.json`);
                 await this.techsStorage.removeTechs(allToRemove);
+                hasChanges = true;
             }
         }
-        // Update latest timestamp to keep record of recent usage
-        await this.techsStorage.updateTimestamps();
+        // Only update timestamps if there were actual changes
+        if (hasChanges) {
+            await this.techsStorage.updateTimestamps();
+        }
+        else {
+            this.logger.info("No changes detected, skipping timestamp update");
+        }
         if (uniqueTechs.length === 0) {
             this.logger.info("No technologies matched, skipping topic update");
             return;
@@ -32438,6 +32541,9 @@ class TechDetector {
             { pattern: /^k8s\//i, techs: ["kubernetes"] },
             { pattern: /^kubernetes\//i, techs: ["kubernetes"] },
             { pattern: /\.ya?ml$/i, techs: ["yaml"] },
+            // Lighthouse configuration files
+            { pattern: /lighthouse.*\.js$/i, techs: ["Lighthouse"] },
+            { pattern: /^\.lighthouserc\.(json|ya?ml|js)$/i, techs: ["Lighthouse"] },
         ];
         try {
             await this.scanFilesForTechs(repoPath, techs, techPatterns);

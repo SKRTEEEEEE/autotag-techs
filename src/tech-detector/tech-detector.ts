@@ -6,6 +6,7 @@ import type { GitHubTopicsManager } from "./github-topics-manager";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { getMappedTechName } from "./tech-name-mappings";
 import { TechsStorage } from "./techs-storage";
 
 interface SimpleIconTech {
@@ -62,8 +63,12 @@ export class TechDetector {
       await this.topicsManager.updateTopics(userTechs);
     }
 
-    const dependencies =
+    const rawDependencies =
       await this.dependencyParser.parseDependencies(repoPath);
+
+    // Apply name mappings to dependencies
+    const dependencies = rawDependencies.map(dep => getMappedTechName(dep));
+
     this.logger.info(`Found ${dependencies.length} dependencies`);
     if (dependencies.length > 0) {
       this.logger.info(
@@ -183,14 +188,17 @@ export class TechDetector {
               return true;
             }
           }
-          // Finally try slug as last resort
-          const resultNormalized = this.techsStorage.normalizeToBadge(
-            result.slug,
-          );
-          this.logger.info(
-            `[Match Check] slug="${result.slug}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`,
-          );
-          return resultNormalized === normalizedBadge;
+          // Finally try slug as last resort (if it exists)
+          if (result.slug) {
+            const resultNormalized = this.techsStorage.normalizeToBadge(
+              result.slug,
+            );
+            this.logger.info(
+              `[Match Check] slug="${result.slug}" (norm="${resultNormalized}") vs search="${normalizedBadge}" - ${resultNormalized === normalizedBadge ? "MATCH" : "no match"}`,
+            );
+            return resultNormalized === normalizedBadge;
+          }
+          return false;
         });
 
         if (exactMatch) {
@@ -259,9 +267,13 @@ export class TechDetector {
       );
     }
 
+    // Track if there were any real changes
+    let hasChanges = false;
+
     // Save only matched techs to techs.json (not all new techs)
     if (uniqueTechs.length > 0) {
       await this.techsStorage.addNewTechs(uniqueTechs);
+      hasChanges = true;
     }
 
     // Remove excluded techs from techs.json when full: false
@@ -274,11 +286,16 @@ export class TechDetector {
           `Removing ${allToRemove.length} unverified/undetected technologies from techs.json`,
         );
         await this.techsStorage.removeTechs(allToRemove);
+        hasChanges = true;
       }
     }
 
-    // Update latest timestamp to keep record of recent usage
-    await this.techsStorage.updateTimestamps();
+    // Only update timestamps if there were actual changes
+    if (hasChanges) {
+      await this.techsStorage.updateTimestamps();
+    } else {
+      this.logger.info("No changes detected, skipping timestamp update");
+    }
 
     if (uniqueTechs.length === 0) {
       this.logger.info("No technologies matched, skipping topic update");
@@ -353,6 +370,9 @@ export class TechDetector {
       { pattern: /^k8s\//i, techs: ["kubernetes"] },
       { pattern: /^kubernetes\//i, techs: ["kubernetes"] },
       { pattern: /\.ya?ml$/i, techs: ["yaml"] },
+      // Lighthouse configuration files
+      { pattern: /lighthouse.*\.js$/i, techs: ["Lighthouse"] },
+      { pattern: /^\.lighthouserc\.(json|ya?ml|js)$/i, techs: ["Lighthouse"] },
     ];
 
     try {

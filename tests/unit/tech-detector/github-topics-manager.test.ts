@@ -112,7 +112,7 @@ describe("GitHubTopicsManager", () => {
 
       const call = vi.mocked(mockOctokit.rest.repos.replaceAllTopics).mock
         .calls[0];
-      expect(call[0].names.length).toBe(20);
+      expect(call[0]?.names.length).toBe(20);
     });
 
     it("should handle API errors gracefully", async () => {
