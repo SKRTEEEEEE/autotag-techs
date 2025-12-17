@@ -152,6 +152,7 @@ When `full: false` (default), only technologies with exact API matches are inclu
 Some important programming languages may not have exact matches in the API but should always be detected when present in the repository. These are maintained in an exception list:
 
 - **`go`**: Go language is always included when detected, even without exact API match
+- **`shell`**: Shell scripting (Bash/sh) is always included when detected, even without exact API match
 
 This ensures that primary languages are captured regardless of API availability, while maintaining strict validation for other technologies.
 
