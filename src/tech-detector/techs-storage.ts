@@ -278,6 +278,14 @@ export class TechsStorage {
         message: "chore: update techs.json with detected technologies",
         content: Buffer.from(content).toString("base64"),
         sha,
+        committer: {
+          name: "github-actions[bot]",
+          email: "41898282+github-actions[bot]@users.noreply.github.com",
+        },
+        author: {
+          name: "github-actions[bot]",
+          email: "41898282+github-actions[bot]@users.noreply.github.com",
+        },
       });
 
       this.logger.info("Successfully pushed techs.json to GitHub");
