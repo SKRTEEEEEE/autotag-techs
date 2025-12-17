@@ -5,7 +5,9 @@
 <h1 align="center">⭐ Auto Tag Techs Github Action ⭐</h1>
 
 <p align="center">
-  Template for new Github Actions based on Typescript with the Best Practices and Ready to be Released
+  Automatically detect and tag technologies in your repository using Simple Icons API.
+  <br />
+  Smart dependency parsing • Intelligent name mapping • Zero configuration needed
 </p>
 
 <p align="center">
@@ -23,9 +25,20 @@ For detailed instructions on how to use this template with **Windows + Git Bash*
 
 ## 🎯 Motivation
 
-Starting a new github action with NodeJS can be a bit frustrating, there are a lot of things to consider if we want to have a really good starting point where later we can iterate.
+Keeping your repository topics up-to-date with the technologies you actually use can be tedious and error-prone. Manual tagging often results in:
 
-The main objective of this template is to provide a good base configuration for our NodeJS Github Actions that we can start using.
+- 🔴 Outdated or forgotten technology tags
+- 🔴 Inconsistent naming (Next.js vs nextjs vs next)
+- 🔴 Missing dependencies from nested package managers
+- 🔴 No automation for new tech additions
+
+**Auto Tag Techs** solves this by automatically:
+
+- ✅ Scanning all dependency files (package.json, requirements.txt, go.mod, etc.)
+- ✅ Mapping package names to official Simple Icons names (lucide-react → Lucide)
+- ✅ Validating against Simple Icons API for accuracy
+- ✅ Creating and maintaining GitHub repository topics
+- ✅ Preventing duplicate runs and infinite loops with smart change detection
 
 ## 🌟 What is including?
 
@@ -52,6 +65,48 @@ The main objective of this template is to provide a good base configuration for 
 ### For User
 
 1. 🐈‍⬛ Usage of local cache and controlled call (only when deps change) for fast action.
+
+## ✨ Key Features
+
+### 🎯 Intelligent Package Name Mapping
+
+The action includes a comprehensive dictionary that maps 60+ common package names to their official Simple Icons identifiers:
+
+- **UI Libraries:** `lucide-react` → `Lucide`, `@radix-ui/*` → `Radix UI`
+- **Frameworks:** `next-intl` → `Next.js`, `react-dom` → `React`
+- **Testing:** `@playwright/test` → `Playwright`, `@vitest/*` → `Vitest`
+- **Styling:** `tailwind-merge` → `Tailwind CSS`, `tw-animate-css` → `Tailwind CSS`
+- And many more! See [tech-name-mappings.ts](src/tech-detector/tech-name-mappings.ts)
+
+### 🔄 Smart Change Detection
+
+The action avoids unnecessary runs and API calls by:
+
+1. **Mapping-aware comparison:** Compares `lucide-react` as `Lucide` against stored techs
+2. **Dependency hash tracking:** Only runs when package.json, requirements.txt, etc. change
+3. **Content verification:** Skips commit if techs.json content is identical
+4. **Bot detection:** Prevents infinite loops by skipping when triggered by bot commits
+
+### 🚫 Infinite Loop Prevention
+
+Critical safeguards to prevent repository saturation:
+
+- ✅ Detects when action is triggered by `github-actions[bot]`
+- ✅ Exits immediately to break potential commit loops
+- ✅ Documented in [AGENTS.md](AGENTS.md) for AI developers
+
+### 📦 Multi-Language Support
+
+Detects dependencies from 10+ package managers:
+
+- **JavaScript/Node:** package.json, yarn.lock, pnpm-lock.yaml
+- **Python:** requirements.txt, Pipfile, pyproject.toml
+- **Go:** go.mod
+- **Rust:** Cargo.toml
+- **PHP:** composer.json
+- **Ruby:** Gemfile
+- **Java:** pom.xml, build.gradle
+- **Config files:** Dockerfile, docker-compose.yml, lighthouserc.js
 
 ## 👀 Usage
 
