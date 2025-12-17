@@ -4,6 +4,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { DependencyParser } from "../dependency-parser/dependency-parser";
+import { getMappedTechName } from "../tech-detector/tech-name-mappings";
 
 export class ChangeDetector {
   private lastRunFile: string;
@@ -86,10 +87,15 @@ export class ChangeDetector {
   }
 
   async getCurrentDependenciesHash(): Promise<string> {
-    const dependencies = await this.dependencyParser.parseDependencies(
+    const rawDependencies = await this.dependencyParser.parseDependencies(
       this.repoPath,
     );
-    const dependenciesString = dependencies.sort().join(",");
+
+    // Apply tech name mappings to dependencies for accurate comparison
+    const mappedDependencies = rawDependencies.map(dep =>
+      getMappedTechName(dep),
+    );
+    const dependenciesString = mappedDependencies.sort().join(",");
 
     // Also include techs.json content in hash to detect any changes
     let techsJsonContent = "";

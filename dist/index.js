@@ -31954,7 +31954,7 @@ class GitHubTopicsManager {
 const TECH_NAME_MAPPINGS = {
     // UI Libraries & Icon Sets
     "lucide-react": "Lucide",
-    "lucide": "Lucide",
+    lucide: "Lucide",
     "@radix-ui/react-alert-dialog": "Radix UI",
     "@radix-ui/react-avatar": "Radix UI",
     "@radix-ui/react-dialog": "Radix UI",
@@ -32679,6 +32679,7 @@ class TechDetector {
 ;// CONCATENATED MODULE: ./src/utils/change-detector.ts
 
 
+
 class ChangeDetector {
     repoPath;
     dependencyParser;
@@ -32743,8 +32744,10 @@ class ChangeDetector {
         }
     }
     async getCurrentDependenciesHash() {
-        const dependencies = await this.dependencyParser.parseDependencies(this.repoPath);
-        const dependenciesString = dependencies.sort().join(",");
+        const rawDependencies = await this.dependencyParser.parseDependencies(this.repoPath);
+        // Apply tech name mappings to dependencies for accurate comparison
+        const mappedDependencies = rawDependencies.map(dep => getMappedTechName(dep));
+        const dependenciesString = mappedDependencies.sort().join(",");
         // Also include techs.json content in hash to detect any changes
         let techsJsonContent = "";
         try {
@@ -32795,6 +32798,15 @@ class Action {
     }
     async run(inputs) {
         this.logger.info("Starting autotag-techs-action...");
+        // CRITICAL: Skip if last commit was made by github-actions[bot] to prevent infinite loops
+        const lastCommitAuthor = process.env.GITHUB_ACTOR ?? "";
+        const isBot = lastCommitAuthor === "github-actions[bot]" ||
+            lastCommitAuthor === "github-actions";
+        if (isBot) {
+            this.logger.info(`Skipping action: Last commit was made by ${lastCommitAuthor} (bot)`);
+            this.outputs.setSkipMessage("Skipped to prevent infinite loop: last commit was by bot");
+            return;
+        }
         const octokit = new dist_src_Octokit({ auth: inputs.token });
         const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
         if (!owner || !repo) {

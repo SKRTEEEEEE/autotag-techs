@@ -1,6 +1,7 @@
 [files]
 extend-exclude = [
   "dist",
+  "AGENTS.md",  # Contains Spanish text by design
   "docs/*/*.md",  # All .md files in immediate subdirectories under docs/
   "docs*/**/*.md",  # All .md files in any nested subdirectories under docs/
   "docs\\*\\*.md",  # Windows path format for immediate subdirectories

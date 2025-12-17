@@ -20,6 +20,22 @@ export class Action {
   async run(inputs: Inputs) {
     this.logger.info("Starting autotag-techs-action...");
 
+    // CRITICAL: Skip if last commit was made by github-actions[bot] to prevent infinite loops
+    const lastCommitAuthor = process.env.GITHUB_ACTOR ?? "";
+    const isBot =
+      lastCommitAuthor === "github-actions[bot]" ||
+      lastCommitAuthor === "github-actions";
+
+    if (isBot) {
+      this.logger.info(
+        `Skipping action: Last commit was made by ${lastCommitAuthor} (bot)`,
+      );
+      this.outputs.setSkipMessage(
+        "Skipped to prevent infinite loop: last commit was by bot",
+      );
+      return;
+    }
+
     const octokit = new Octokit({ auth: inputs.token });
 
     const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
